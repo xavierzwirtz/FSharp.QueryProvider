@@ -9,4 +9,4 @@ type EmptyQueryProvider() =
     member this.Expressions with get() = expressions
     override this.Execute expression =
         expressions <- ([expression] |> Seq.append expressions)
-        failwith "not implemented"
+        failwith "EmptyQueryProvider.Execute not implemented"
