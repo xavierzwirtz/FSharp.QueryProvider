@@ -1,0 +1,23 @@
+type project
+owners
+    Xavier Zwirtz
+authors 
+    Xavier Zwirtz
+projectUrl
+    http://github.com/VoiceOfWisdom/FSharp.QueryProvider
+iconUrl
+    https://raw.githubusercontent.com/VoiceOfWisdom/FSharp.QueryProvider/master/docs/files/img/logo.png
+licenseUrl
+    http://github.com/VoiceOfWisdom/FSharp.QueryProvider/blob/master/LICENSE.txt
+requireLicenseAcceptance
+    false
+copyright
+    Copyright 2015
+tags
+    f#
+summary
+    Makes implementing IQueryable and IQueryProvider in F# functional and easy.
+description
+    Description not set
+
+
