@@ -39,7 +39,12 @@ module SqlServer =
         let createSelect tableName columnList =
                 ["SELECT "] @ columnList @ [" FROM "; tableName]
         let getMethod name (ml : MethodCallExpression list) = 
-            ml |> List.tryFind(fun m -> m.Method.Name = name)
+            let m = ml |> List.tryFind(fun m -> m.Method.Name = name)
+            match m with
+            | Some m -> 
+                Some(m), (ml |> List.filter(fun ms -> ms <> m))
+            | None -> None, ml
+            
         let getBody (m : MethodCallExpression) =
             (stripQuotes (m.Arguments.Item(1))) :?> LambdaExpression
 
@@ -81,16 +86,23 @@ module SqlServer =
                     let linqChain = getOperationsAndQueryable m
 
                     match linqChain with
-                    | Some (queryable, methods) ->
-                        let getMethod name = getMethod name methods
+                    | Some (queryable, ml) ->
+                        //let getMethod name = getMethod name methods
 
-                        let select = getMethod "Select"
-                        let where = getMethod "Where"
-                        let count = getMethod "Count"
-                        let last = getMethod "Last"
+                        let select, ml = getMethod "Select" ml
+                        let where, ml = getMethod "Where" ml
+                        let count, ml = getMethod "Count" ml
+                        let last, ml = getMethod "Last" ml
+                        let lastOrDefault, ml= getMethod "LastOrDefault" ml
+
+                        if ml |> Seq.length > 0 then 
+                            let methodNames = (ml |> Seq.map(fun m -> sprintf "'%s'" m.Method.Name) |> String.concat(","))
+                            failwithf "Methods not implemented: %s" methodNames
 
                         if last.IsSome then
                             failwith "'last' operator has no translations for Sql Server"
+                        if lastOrDefault.IsSome then
+                            failwith "'lastOrDefault' operator has no translations for Sql Server"
 
                         let star = ["*"]
                         let selectColumn = 
