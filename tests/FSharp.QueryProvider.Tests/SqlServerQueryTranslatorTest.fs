@@ -147,7 +147,7 @@ module QueryGenTest =
                 select (p.PersonName, p.PersonId)
             } :> obj
         
-        AreEqualExpression q "SELECT T0.PersonName, T0.PersonID FROM Person AS T0"
+        AreEqualExpression q "SELECT T0.PersonName, T0.PersonId FROM Person AS T0"
 
     [<Test>]
     let ``count``() =
@@ -180,7 +180,7 @@ module QueryGenTest =
                 contains 11
             } :> obj
         
-        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM Person WHERE (PersonID = '11')"
+        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM Person WHERE (PersonId = '11')"
 
     [<Test>]
     let ``contains whole``() =
@@ -216,7 +216,7 @@ module QueryGenTest =
                 contains 11
             } :> obj
         
-        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM Person WHERE (PersonName = 'john' AND PersonID = '11')"
+        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM Person WHERE (PersonName = 'john' AND PersonId = '11')"
 
     [<Test>]
     let ``last throws``() =
@@ -336,7 +336,7 @@ module QueryGenTest =
                 minBy p.PersonId
             } :> obj
         
-        AreEqualExpression q "SELECT TOP 1 PersonID FROM Person ORDER BY PersonID ASC"
+        AreEqualExpression q "SELECT TOP 1 PersonId FROM Person ORDER BY PersonId ASC"
     
     [<Test>]
     let ``minBy where``() =
@@ -347,7 +347,7 @@ module QueryGenTest =
                 minBy p.PersonId
             } :> obj
         
-        AreEqualExpression q "SELECT TOP 1 PersonID FROM Person WHERE (PersonName = 'john') ORDER BY PersonID ASC"
+        AreEqualExpression q "SELECT TOP 1 PersonId FROM Person WHERE (PersonName = 'john') ORDER BY PersonId ASC"
 
     [<Test>]
     let ``maxBy``() =
@@ -357,7 +357,7 @@ module QueryGenTest =
                 maxBy p.PersonId
             } :> obj
         
-        AreEqualExpression q "SELECT TOP 1 PersonID FROM Person ORDER BY PersonID DESC"
+        AreEqualExpression q "SELECT TOP 1 PersonId FROM Person ORDER BY PersonId DESC"
     
     [<Test>]
     let ``maxBy where``() =
@@ -368,7 +368,7 @@ module QueryGenTest =
                 maxBy p.PersonId
             } :> obj
         
-        AreEqualExpression q "SELECT TOP 1 PersonID FROM Person WHERE (PersonName = 'john') ORDER BY PersonID DESC"
+        AreEqualExpression q "SELECT TOP 1 PersonId FROM Person WHERE (PersonName = 'john') ORDER BY PersonId DESC"
 
     [<Test>]
     [<Ignore>]
@@ -383,7 +383,7 @@ module QueryGenTest =
                 select (g, query { for x in g do count })
             } :> obj
 
-        AreEqualExpression q "SELECT PersonID, COUNT(*) FROM Person GROUP BY PersonID"
+        AreEqualExpression q "SELECT PersonId, COUNT(*) FROM Person GROUP BY PersonId"
 
     [<Test>]
     let ``groupBy select``() =
@@ -418,7 +418,7 @@ module QueryGenTest =
                 sortBy p.PersonId
             } :> obj
             
-        AreEqualExpression q "SELECT * FROM Person ORDER BY PersonID ASC"
+        AreEqualExpression q "SELECT * FROM Person ORDER BY PersonId ASC"
 
     [<Test>]
     let ``sortBy thenBy``() =
@@ -429,7 +429,7 @@ module QueryGenTest =
                 thenBy p.PersonName
             } :> obj
             
-        AreEqualExpression q "SELECT * FROM Person ORDER BY PersonID ASC, PersonName ASC"
+        AreEqualExpression q "SELECT * FROM Person ORDER BY PersonId ASC, PersonName ASC"
 
     [<Test>]
     let ``sortBy thenByDescending``() =
@@ -440,7 +440,7 @@ module QueryGenTest =
                 thenByDescending p.PersonName
             } :> obj
             
-        AreEqualExpression q "SELECT * FROM Person ORDER BY PersonID ASC, PersonName DESC"
+        AreEqualExpression q "SELECT * FROM Person ORDER BY PersonId ASC, PersonName DESC"
 
     [<Test>]
     let ``sortBy where``() =
@@ -451,7 +451,7 @@ module QueryGenTest =
                 where(p.PersonName = "john")
             } :> obj
             
-        AreEqualExpression q "SELECT * FROM Person WHERE (PersonName = 'john') ORDER BY PersonID ASC"
+        AreEqualExpression q "SELECT * FROM Person WHERE (PersonName = 'john') ORDER BY PersonId ASC"
 
     [<Test>]
     let ``sortByDescending``() =
@@ -461,7 +461,7 @@ module QueryGenTest =
                 sortByDescending p.PersonId
             } :> obj
             
-        AreEqualExpression q "SELECT * FROM Person ORDER BY PersonID DESC"
+        AreEqualExpression q "SELECT * FROM Person ORDER BY PersonId DESC"
 
     [<Test>]
     let ``sortByDescending thenBy``() =
@@ -472,7 +472,7 @@ module QueryGenTest =
                 thenBy p.PersonName
             } :> obj
             
-        AreEqualExpression q "SELECT * FROM Person ORDER BY PersonID DESC, PersonName ASC"
+        AreEqualExpression q "SELECT * FROM Person ORDER BY PersonId DESC, PersonName ASC"
 
     [<Test>]
     let ``sortByDescending thenByDescending``() =
@@ -483,7 +483,7 @@ module QueryGenTest =
                 thenByDescending p.PersonName
             } :> obj
             
-        AreEqualExpression q "SELECT * FROM Person ORDER BY PersonID DESC, PersonName DESC"
+        AreEqualExpression q "SELECT * FROM Person ORDER BY PersonId DESC, PersonName DESC"
 
     [<Test>]
     let ``sortByDescending where``() =
@@ -494,7 +494,7 @@ module QueryGenTest =
                 where(p.PersonName = "john")
             } :> obj
             
-        AreEqualExpression q "SELECT * FROM Person WHERE (PersonName = 'john') ORDER BY PersonID DESC"
+        AreEqualExpression q "SELECT * FROM Person WHERE (PersonName = 'john') ORDER BY PersonId DESC"
 
 // To be implemented:        
 //query {

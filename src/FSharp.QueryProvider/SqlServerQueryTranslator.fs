@@ -38,12 +38,17 @@ module SqlServer =
 //            //if existing.
         let createSelect tableName columnList =
                 ["SELECT "] @ columnList @ [" FROM "; tableName]
+
         let getMethod name (ml : MethodCallExpression list) = 
             let m = ml |> List.tryFind(fun m -> m.Method.Name = name)
             match m with
             | Some m -> 
                 Some(m), (ml |> List.filter(fun ms -> ms <> m))
             | None -> None, ml
+
+        let getMethods names (ml : MethodCallExpression list) = 
+            let methods = ml |> List.filter(fun m -> names |> List.exists(fun n -> m.Method.Name = n))
+            methods, (ml |> List.filter(fun ms -> methods |> List.forall(fun m -> m <> ms)))
             
         let getBody (m : MethodCallExpression) =
             (stripQuotes (m.Arguments.Item(1))) :?> LambdaExpression
@@ -94,6 +99,7 @@ module SqlServer =
                         let count, ml = getMethod "Count" ml
                         let last, ml = getMethod "Last" ml
                         let lastOrDefault, ml= getMethod "LastOrDefault" ml
+                        let sorts, ml= getMethods ["OrderBy"; "OrderByDescending"; "ThenBy"; "ThenByDescending"] ml
 
                         if ml |> Seq.length > 0 then 
                             let methodNames = (ml |> Seq.map(fun m -> sprintf "'%s'" m.Method.Name) |> String.concat(","))
@@ -134,7 +140,25 @@ module SqlServer =
                                 [" WHERE ("] @ where @ [")"]
                             | None -> []
 
-                        Some (selectStatement @ whereClause)
+                        let orderByClause =
+                            match sorts with
+                            | [] -> []
+                            | _ ->
+                                let colSorts = 
+                                    sorts |> List.rev |> List.map(fun s ->
+                                        let sortMethod = 
+                                            match s.Method.Name with
+                                            | "OrderBy" | "ThenBy" -> "ASC"
+                                            | "OrderByDescending" | "ThenByDescending" -> "DESC"
+                                            | n -> failwithf "Sort methods not implemented '%s'" n
+                                        let lambda = getBody(s)
+                                        (lambda.Body |> map) @ [" "; sortMethod]
+                                    ) |> List.fold(fun acum ls -> 
+                                        match acum with | [] -> acum @ ls | _ -> acum @ [", "] @ ls) []
+
+                                [" ORDER BY "] @ colSorts
+
+                        Some (selectStatement @ whereClause @ orderByClause)
                     | None ->
                         match m.Method.Name with
                         | "Contains" | "StartsWith" | "EndsWith" as typeName when(m.Object.Type = typedefof<string>) ->
@@ -147,42 +171,6 @@ module SqlServer =
                                 | _ -> failwithf "not implemented %s" typeName
                             Some (map(m.Object) @ [" LIKE '"] @ arg @ ["'"])
                         | x -> failwithf "Method '%s' is not implemented." x
-
-//                    match m.Method.Name with
-//                    | "Select" | "Where" ->
-//                        //let argResult = arg |> map
-//                        let lambda = (stripQuotes (m.Arguments.Item(1))) :?> LambdaExpression
-//                        let result = 
-//                            match m.Method.Name with
-//                            | "Select" -> 
-//                                let tableName = ((arg :?> ConstantExpression).Value :?> IQueryable).ElementType.Name
-//
-//                                let selectList = 
-//                                    match lambda.Body with 
-//                                    | :? ParameterExpression as paramAccess -> 
-//                                        let param = (lambda.Parameters |> Seq.exactlyOne)
-//                                        if lambda.Parameters.Count = 1 && paramAccess.Type = param.Type then
-//                                            ["*"]
-//                                        else 
-//                                            failwithf "unexpected parameter type '%s'" param.Type.Name
-//                                    | _ -> lambda.Body |> map
-//                                createSelect tableName selectList
-//                            | "Where" -> 
-//                                let select = map arg
-//                                let where = lambda.Body |> map
-//                                select @ [" WHERE ("] @ where @ [")"]
-//                            | x -> failwithf "Method '%s' is not implemented." x
-//                        Some result
-//                    | "Contains" | "StartsWith" | "EndsWith" as typeName when(m.Object.Type = typedefof<string>) ->
-//                        let value = (arg :?> ConstantExpression).Value :?> string
-//                        let arg =
-//                            match typeName with 
-//                            | "Contains" -> ["%"; value; "%"]
-//                            | "StartsWith" -> ["%"; value]
-//                            | "EndsWith" -> [value; "%"]
-//                            | _ -> failwithf "not implemented %s" typeName
-//                        Some (map(m.Object) @ [" LIKE '"] @ arg @ ["'"])
-//                    | x -> failwithf "Method '%s' is not implemented." x
                 | Not n ->
                     Some ([" NOT "] @ map(n.Operand))
                 | And e -> bin e "AND"

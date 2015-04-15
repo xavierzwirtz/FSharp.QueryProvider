@@ -70,6 +70,8 @@ type Query<'T>(provider : QueryProvider, expression : Expression option) as this
         member this.Provider = 
             this.provider :> IQueryProvider
 
+    interface IOrderedQueryable<'T>
+
     interface IEnumerable with
         member this.GetEnumerator() =
             let x = this.provider.Execute(hardExpression) :?> IEnumerable
