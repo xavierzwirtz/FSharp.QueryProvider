@@ -22,6 +22,15 @@ open FSharp.QueryProvider.ExpressionMatching
 
 module SqlServer =
     
+    module private List =
+            let interpolate (toInsert : 'T) (list : 'T list) : 'T list=
+                list 
+                |> List.fold(fun acum ls -> 
+                    match acum with 
+                    | [] -> [ls]
+                    | _ -> acum @ [toInsert; ls]
+                ) []
+
     let translate (expression : Expression) = 
         
 //        let mutable tableAliases = Map.empty<Expression, string>
@@ -36,6 +45,19 @@ module SqlServer =
 //            else
 //                existing.Value
 //            //if existing.
+        let getLambda (m : MethodCallExpression) =
+            (stripQuotes (m.Arguments.Item(1))) :?> LambdaExpression
+
+        let (|SingleSameSelect|_|) (l : LambdaExpression) =
+            match l.Body with
+            | :? ParameterExpression as paramAccess -> 
+                let param = (l.Parameters |> Seq.exactlyOne)
+                if l.Parameters.Count = 1 && paramAccess.Type = param.Type then
+                    Some param
+                else 
+                    None
+            | _ -> None
+
         let createSelect tableName columnList =
                 ["SELECT "] @ columnList @ [" FROM "; tableName]
 
@@ -49,9 +71,6 @@ module SqlServer =
         let getMethods names (ml : MethodCallExpression list) = 
             let methods = ml |> List.filter(fun m -> names |> List.exists(fun n -> m.Method.Name = n))
             methods, (ml |> List.filter(fun ms -> methods |> List.forall(fun m -> m <> ms)))
-            
-        let getBody (m : MethodCallExpression) =
-            (stripQuotes (m.Arguments.Item(1))) :?> LambdaExpression
 
         let rec mapFun e : ExpressionResult * list<string> option = 
             let map = map(mapFun)
@@ -95,11 +114,29 @@ module SqlServer =
                         //let getMethod name = getMethod name methods
 
                         let select, ml = getMethod "Select" ml
-                        let where, ml = getMethod "Where" ml
+                        let wheres, ml = getMethods ["Where"] ml
                         let count, ml = getMethod "Count" ml
                         let last, ml = getMethod "Last" ml
                         let lastOrDefault, ml= getMethod "LastOrDefault" ml
+                        let contains, ml = getMethod "Contains" ml
+                        let single, ml = getMethod "Single" ml
+                        let singleOrDefault, ml = getMethod "SingleOrDefault" ml
+                        let first, ml = getMethod "First" ml
+                        let firstOrDefault, ml = getMethod "FirstOrDefault" ml
+                        let max, ml = getMethod "Max" ml
+                        let min, ml = getMethod "Min" ml
+                        
                         let sorts, ml= getMethods ["OrderBy"; "OrderByDescending"; "ThenBy"; "ThenByDescending"] ml
+                        let sorts, maxOrMin = 
+                            let m = 
+                                match max,min with
+                                | Some _, Some _ -> failwith "invalid"
+                                | Some m, None -> Some(m)
+                                | None, Some m -> Some(m)
+                                | None, None -> None
+                            match m with
+                            | Some _ -> sorts @ [m.Value], m
+                            | None -> sorts, m
 
                         if ml |> Seq.length > 0 then 
                             let methodNames = (ml |> Seq.map(fun m -> sprintf "'%s'" m.Method.Name) |> String.concat(","))
@@ -110,35 +147,74 @@ module SqlServer =
                         if lastOrDefault.IsSome then
                             failwith "'lastOrDefault' operator has no translations for Sql Server"
 
-                        let star = ["*"]
+                        let star = ["* "]
                         let selectColumn = 
                             match count with
-                            | Some c-> ["COUNT(*)"]  //not fully implemented
+                            | Some c-> ["COUNT(*) "]  //not fully implemented
                             | None -> 
-                                match select with
-                                | Some s->
-                                    let lambda = getBody(s)
-                                    match lambda.Body with 
-                                    | :? ParameterExpression as paramAccess -> 
-                                        let param = (lambda.Parameters |> Seq.exactlyOne)
-                                        if lambda.Parameters.Count = 1 && paramAccess.Type = param.Type then
-                                            star
-                                        else 
-                                            failwithf "unexpected parameter type '%s'" param.Type.Name
-                                    | _ -> lambda.Body |> map
-                                | None -> star
+                                match contains with 
+                                | Some c -> 
+                                    ["CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END "]
+                                | None -> 
+                                    match maxOrMin with 
+                                    | Some m ->
+                                        (getLambda(m).Body |> map) @ [" "]
+                                    | None -> 
+                                        match select with
+                                        | Some s->
+                                            match getLambda(s) with
+                                            | SingleSameSelect _ -> star
+                                            | l -> (l.Body |> map) @ [" "]
+                                        | None -> star
+
+                        let topStatement = 
+                            let count = 
+                                if single.IsSome || singleOrDefault.IsSome then
+                                    Some 2
+                                else if 
+                                    first.IsSome ||
+                                    firstOrDefault.IsSome ||
+                                    max.IsSome || 
+                                    min.IsSome then
+                                    Some 1
+                                else
+                                    None
+
+                            match count with
+                            | Some i -> ["TOP "; i.ToString(); " "]
+                            | None -> []
+
                         let selectStatement =
                             let table = queryable.ElementType.Name
-                            ["SELECT " ] @ selectColumn @ [" FROM "; table]
+                            ["SELECT " ] @ topStatement @ selectColumn @ ["FROM "; table]
 
                         let whereClause =
-                            match where with
-                            | Some w-> 
-                                //let select = map arg
-                                let lambda = getBody(w)
-                                let where = lambda.Body |> map
-                                [" WHERE ("] @ where @ [")"]
-                            | None -> []
+                            let fromWhere = 
+                                match wheres with
+                                | [] -> []
+                                | _ -> 
+                                    wheres |> List.rev |> List.map(fun w ->
+                                        let lambda = getLambda(w)
+                                        lambda.Body |> map
+                                    ) |> List.interpolate [" AND "] |> List.concat
+                                    
+                            let fromContains =
+                                match contains with
+                                | Some c -> 
+                                    let x = getLambda(select.Value).Body |> map
+                                    let y = c.Arguments.Item(1) |> map
+                                    x @ [" = "] @ y
+                                | None -> []
+                            let total = 
+                                match fromWhere, fromContains with
+                                | [], [] -> []
+                                | _, [] -> fromWhere
+                                | [], _ -> fromContains
+                                | _, _ -> fromWhere @ [" AND "] @ fromContains
+
+                            match total with 
+                            | [] -> []
+                            | _ -> [" WHERE ("] @ total @ [")"]
 
                         let orderByClause =
                             match sorts with
@@ -148,13 +224,12 @@ module SqlServer =
                                     sorts |> List.rev |> List.map(fun s ->
                                         let sortMethod = 
                                             match s.Method.Name with
-                                            | "OrderBy" | "ThenBy" -> "ASC"
-                                            | "OrderByDescending" | "ThenByDescending" -> "DESC"
+                                            | "Min" | "OrderBy" | "ThenBy" -> "ASC"
+                                            | "Max" | "OrderByDescending" | "ThenByDescending" -> "DESC"
                                             | n -> failwithf "Sort methods not implemented '%s'" n
-                                        let lambda = getBody(s)
+                                        let lambda = getLambda(s)
                                         (lambda.Body |> map) @ [" "; sortMethod]
-                                    ) |> List.fold(fun acum ls -> 
-                                        match acum with | [] -> acum @ ls | _ -> acum @ [", "] @ ls) []
+                                    ) |> List.interpolate [", "] |> List.concat
 
                                 [" ORDER BY "] @ colSorts
 
@@ -198,10 +273,10 @@ module SqlServer =
                         let cv = 
                             match System.Type.GetTypeCode(c.Value.GetType()) with 
                             | System.TypeCode.Boolean -> if (c.Value :?> bool) then "1" else "0"
-                            | System.TypeCode.String -> "'" + (c.Value :?> string) + "'"
+                            | System.TypeCode.String -> (c.Value :?> string)
                             | System.TypeCode.Object -> failwithf "The constant for '%A' is not supported" c.Value
                             | _ -> c.Value.ToString()
-                        Some [cv]
+                        Some ["'"; cv; "'"]
                 | MemberAccess m ->
                     if m.Expression <> null && m.Expression.NodeType = ExpressionType.Parameter then
                         Some [m.Member.Name]

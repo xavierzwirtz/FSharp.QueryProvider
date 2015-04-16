@@ -80,6 +80,17 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT * FROM Person WHERE (PersonName = 'john')"
+    [<Test>]
+    let ``double where``() =
+        let q = fun () -> 
+            query {
+                for p in queryable<Person> do
+                where(p.PersonName = "john")
+                where(p.PersonId = 5)
+                select p
+            } :> obj
+        
+        AreEqualExpression q "SELECT * FROM Person WHERE (PersonName = 'john' AND PersonId = '5')"
 
     [<Test>]
     let ``where with single or``() =
