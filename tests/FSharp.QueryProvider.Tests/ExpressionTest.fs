@@ -28,7 +28,7 @@ let ``map``() =
     ignore()
 
     let result = 
-        map(fun e -> Recurse,[e.NodeType.ToString()] |> Some) source
+        map(fun e -> Recurse, e.NodeType.ToString() ) source
         |> String.concat(",")
     Assert.AreEqual("Constant,Constant,Add", result)
     //let

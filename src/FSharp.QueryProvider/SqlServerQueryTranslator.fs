@@ -1,16 +1,17 @@
 ﻿namespace FSharp.QueryProvider.QueryTranslator
 
-type PreparedParameter =
+type PreparedParameter<'T> =
     {
         Name : string
-        Value : obj
+        Value : obj 
+        DbType : 'T
     }
 
-type PreparedStatement =
+type PreparedStatement<'P> =
     {
         Text : string
         FormattedText : string
-        Parameters : PreparedParameter seq
+        Parameters : PreparedParameter<'P> seq
     }
 
 type IQueryable = System.Linq.IQueryable
@@ -23,12 +24,12 @@ open FSharp.QueryProvider.ExpressionMatching
 module SqlServer =
     
     module private List =
-            let interpolate (toInsert : 'T) (list : 'T list) : 'T list=
+            let interpolate (toInsert : 'T list) (list : 'T list) : 'T list=
                 list 
-                |> List.fold(fun acum ls -> 
+                |> List.fold(fun acum item -> 
                     match acum with 
-                    | [] -> [ls]
-                    | _ -> acum @ [toInsert; ls]
+                    | [] -> [item]
+                    | _ -> acum @ toInsert @ [item]
                 ) []
 
     let translate (expression : Expression) = 
@@ -45,6 +46,13 @@ module SqlServer =
 //            else
 //                existing.Value
 //            //if existing.
+
+        let columnNameUnique = ref 0
+
+        let getColumnNameIndex () = 
+            columnNameUnique := (!columnNameUnique + 1)
+            !columnNameUnique
+
         let getLambda (m : MethodCallExpression) =
             (stripQuotes (m.Arguments.Item(1))) :?> LambdaExpression
 
@@ -58,8 +66,8 @@ module SqlServer =
                     None
             | _ -> None
 
-        let createSelect tableName columnList =
-                ["SELECT "] @ columnList @ [" FROM "; tableName]
+//        let createSelect tableName columnList =
+//                ["SELECT "] @ columnList @ [" FROM "; tableName]
 
         let getMethod name (ml : MethodCallExpression list) = 
             let m = ml |> List.tryFind(fun m -> m.Method.Name = name)
@@ -72,10 +80,20 @@ module SqlServer =
             let methods = ml |> List.filter(fun m -> names |> List.exists(fun n -> m.Method.Name = n))
             methods, (ml |> List.filter(fun ms -> methods |> List.forall(fun m -> m <> ms)))
 
-        let rec mapFun e : ExpressionResult * list<string> option = 
+        let splitListOfTuples source = 
+            source |> List.fold(fun a b ->
+                fst(a) @ fst(b), snd(a) @ snd(b)
+            ) (List.empty, List.empty)
+
+        let rec mapFun e : ExpressionResult * (list<string> * list<PreparedParameter<_>>) = 
             let map = map(mapFun)
-            let bin (e : BinaryExpression) text = 
-                Some (map(e.Left) @ [" "; text; " "] @ map(e.Right))
+            let map2 = fun e ->
+                map e |> splitListOfTuples
+                
+            let bin (e : BinaryExpression) (text : string) = 
+                let leftSql, leftParams = map2(e.Left)
+                let rightSql, rightParams = map2(e.Right)
+                Some (leftSql @ [" "; text; " "] @ rightSql, leftParams @ rightParams)
 
             let getOperationsAndQueryable e : option<IQueryable * MethodCallExpression list> =
                 let rec get (e : MethodCallExpression) : option<IQueryable option * MethodCallExpression list> = 
@@ -103,7 +121,28 @@ module SqlServer =
                 | Some result -> 
                     Some(fst(result).Value, snd(result))
 
-            let result = 
+            let constantToQueryAndParam (c : ConstantExpression) = 
+                let dbType = 
+                    match System.Type.GetTypeCode(c.Value.GetType()) with 
+                    | System.TypeCode.Boolean -> System.Data.SqlDbType.Bit
+                    | System.TypeCode.String -> System.Data.SqlDbType.NVarChar
+                    | System.TypeCode.DateTime -> System.Data.SqlDbType.DateTime2
+                    | System.TypeCode.Byte -> System.Data.SqlDbType.TinyInt
+                    | System.TypeCode.Int16 -> System.Data.SqlDbType.SmallInt
+                    | System.TypeCode.Int32 -> System.Data.SqlDbType.Int
+                    | System.TypeCode.Int64 -> System.Data.SqlDbType.BigInt
+                    | System.TypeCode.Object -> failwithf "The constant for '%A' is not supported" c.Value
+                    | t -> failwithf "not implemented type '%s'" (t.ToString())
+
+                let p = {
+                    PreparedParameter.Name = "p" + getColumnNameIndex().ToString()
+                    Value = c.Value
+                    DbType = dbType
+                }
+
+                ["@"; p.Name; ""], [p]
+
+            let result : option<string list * PreparedParameter<_> list> = 
                 match e with
                 | Call m -> 
                     let arg = m.Arguments.Item(0) 
@@ -147,24 +186,27 @@ module SqlServer =
                         if lastOrDefault.IsSome then
                             failwith "'lastOrDefault' operator has no translations for Sql Server"
 
-                        let star = ["* "]
-                        let selectColumn = 
+                        let star = ["* "], []
+                        let selectColumn, selectParameters = 
                             match count with
-                            | Some c-> ["COUNT(*) "]  //not fully implemented
+                            | Some c-> ["COUNT(*) "], []  //not fully implemented
                             | None -> 
                                 match contains with 
                                 | Some c -> 
-                                    ["CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END "]
+                                    ["CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END "], []
                                 | None -> 
                                     match maxOrMin with 
                                     | Some m ->
-                                        (getLambda(m).Body |> map) @ [" "]
+                                        let q, p = (getLambda(m).Body |> map2) 
+                                        q @ [" "], p
                                     | None -> 
                                         match select with
                                         | Some s->
                                             match getLambda(s) with
                                             | SingleSameSelect _ -> star
-                                            | l -> (l.Body |> map) @ [" "]
+                                            | l -> 
+                                                let q, p = (getLambda(m).Body |> map2) 
+                                                q @ [" "], p
                                         | None -> star
 
                         let topStatement = 
@@ -188,39 +230,43 @@ module SqlServer =
                             let table = queryable.ElementType.Name
                             ["SELECT " ] @ topStatement @ selectColumn @ ["FROM "; table]
 
-                        let whereClause =
+                        let whereClause, whereParameters =
                             let fromWhere = 
                                 match wheres with
-                                | [] -> []
+                                | [] -> None
                                 | _ -> 
-                                    wheres |> List.rev |> List.map(fun w ->
-                                        let lambda = getLambda(w)
-                                        lambda.Body |> map
-                                    ) |> List.interpolate [" AND "] |> List.concat
-                                    
+                                    let wheres, parameters =
+                                        wheres |> List.rev |> List.map(fun w ->
+                                            let lambda = getLambda(w)
+                                            let q, p = lambda.Body |> map2
+                                            [q], p
+                                        ) |> splitListOfTuples
+                                    let sql = wheres |> List.interpolate [[" AND "]] |> List.reduce(@)
+                                    Some (sql, parameters)
                             let fromContains =
                                 match contains with
                                 | Some c -> 
-                                    let x = getLambda(select.Value).Body |> map
-                                    let y = c.Arguments.Item(1) |> map
-                                    x @ [" = "] @ y
-                                | None -> []
+                                    let x, xp = getLambda(select.Value).Body |> map2
+                                    let y, yp= c.Arguments.Item(1) |> map2
+                                    Some (x @ [" = "] @ y, xp @ yp)
+                                | None -> None
+
                             let total = 
                                 match fromWhere, fromContains with
-                                | [], [] -> []
-                                | _, [] -> fromWhere
-                                | [], _ -> fromContains
-                                | _, _ -> fromWhere @ [" AND "] @ fromContains
+                                | None, None -> None
+                                | Some w, None -> Some w
+                                | None, Some c -> Some c
+                                | Some(w,wp), Some(c,cp) -> Some(w @ [" AND "] @ c, wp @ cp)
 
                             match total with 
-                            | [] -> []
-                            | _ -> [" WHERE ("] @ total @ [")"]
+                            | None -> [], []
+                            | Some (q, qp) -> [" WHERE ("] @ q @ [")"], qp
 
-                        let orderByClause =
+                        let orderByClause, orderByParameters =
                             match sorts with
-                            | [] -> []
+                            | [] -> [], []
                             | _ ->
-                                let colSorts = 
+                                let colSorts, parameters = 
                                     sorts |> List.rev |> List.map(fun s ->
                                         let sortMethod = 
                                             match s.Method.Name with
@@ -228,26 +274,35 @@ module SqlServer =
                                             | "Max" | "OrderByDescending" | "ThenByDescending" -> "DESC"
                                             | n -> failwithf "Sort methods not implemented '%s'" n
                                         let lambda = getLambda(s)
-                                        (lambda.Body |> map) @ [" "; sortMethod]
-                                    ) |> List.interpolate [", "] |> List.concat
+                                        let sql, parameters = (lambda.Body |> map2)
+                                        [sql @ [" "; sortMethod]], parameters
+                                    ) |> splitListOfTuples
 
-                                [" ORDER BY "] @ colSorts
+                                //let colSorts = colSorts |> List.interpolate [", "]
+                                let colSorts = colSorts |> List.interpolate [[", "]] |> List.reduce(@)
 
-                        Some (selectStatement @ whereClause @ orderByClause)
+                                [" ORDER BY "] @ colSorts, parameters
+
+                        let sql = selectStatement @ whereClause @ orderByClause
+                        let parameters = orderByParameters @ whereParameters
+                        Some (sql, parameters)
                     | None ->
                         match m.Method.Name with
                         | "Contains" | "StartsWith" | "EndsWith" as typeName when(m.Object.Type = typedefof<string>) ->
-                            let value = (arg :?> ConstantExpression).Value :?> string
-                            let arg =
+                            let valQ, valP = constantToQueryAndParam(arg :?> ConstantExpression)
+                            let search =
                                 match typeName with 
-                                | "Contains" -> ["%"; value; "%"]
-                                | "StartsWith" -> ["%"; value]
-                                | "EndsWith" -> [value; "%"]
+                                | "Contains" -> ["'%' + "] @ valQ @ [" + '%'"]
+                                | "StartsWith" -> valQ @ [" + '%'"]
+                                | "EndsWith" -> ["'%' + "] @ valQ
                                 | _ -> failwithf "not implemented %s" typeName
-                            Some (map(m.Object) @ [" LIKE '"] @ arg @ ["'"])
+                            let colQ, colP = map2(m.Object)
+
+                            Some (colQ @ [" LIKE "] @ search, colP @ valP)
                         | x -> failwithf "Method '%s' is not implemented." x
                 | Not n ->
-                    Some ([" NOT "] @ map(n.Operand))
+                    let sql, parameters = map2(n.Operand)
+                    Some ([" NOT "] @ sql, parameters) 
                 | And e -> bin e "AND"
                 | AndAlso e -> bin e "AND"
                 | Or e -> bin e "OR"
@@ -268,36 +323,34 @@ module SqlServer =
                         failwith "dont think this should ever get hit"
                         //Some ["SELECT * FROM "; q.ElementType.Name]
                     else if c.Value = null then
-                        Some ["NULL"]
+                        Some (["NULL"] ,[])
                     else
-                        let cv = 
-                            match System.Type.GetTypeCode(c.Value.GetType()) with 
-                            | System.TypeCode.Boolean -> if (c.Value :?> bool) then "1" else "0"
-                            | System.TypeCode.String -> (c.Value :?> string)
-                            | System.TypeCode.Object -> failwithf "The constant for '%A' is not supported" c.Value
-                            | _ -> c.Value.ToString()
-                        Some ["'"; cv; "'"]
+                        Some (constantToQueryAndParam c)
                 | MemberAccess m ->
                     if m.Expression <> null && m.Expression.NodeType = ExpressionType.Parameter then
-                        Some [m.Member.Name]
+                        Some ([m.Member.Name], [])
                     else
                         failwithf "The member '%s' is not supported" m.Member.Name
                 | _ -> None
-            if result.IsSome then 
-                ExpressionResult.Skip, result
-            else
-                ExpressionResult.Recurse, result
 
-        let ls = 
+            match result with
+            | Some r -> ExpressionResult.Skip, r
+            | None -> ExpressionResult.Recurse, ([], [])
+//            if result.IsSome then 
+//                ExpressionResult.Skip, result
+//            else
+//                ExpressionResult.Recurse, result
+
+        let results = 
             expression
             |> map(mapFun)
 
-        let query = 
-            ls 
-            |> String.concat("")
+        let queryList, queryParameters =  results |> splitListOfTuples
+
+        let query = queryList |> String.concat("")
 
         {
             PreparedStatement.Text = query
             FormattedText = query
-            Parameters = []
+            Parameters = queryParameters //Seq.empty<PreparedParameter<System.Data.SqlDbType>>
         }

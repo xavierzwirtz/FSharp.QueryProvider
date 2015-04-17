@@ -28,15 +28,14 @@ let rec visit transform (expression : Expression)  =
     let visitor = Visitor(transform)
     visitor.Visit expression
 
-let rec map (mapping : Expression -> ExpressionResult * option<list<'t>>) (expression : Expression) : 't list =
+let rec map (mapping : Expression -> ExpressionResult * 't) (expression : Expression) : 't list =
     
     let totalResult = ref List.empty<'t>
     let visitor = 
         Visitor(fun e ->
-            let expResult,result = mapping e
+            let expResult, result = mapping e
 
-            if result.IsSome then
-                totalResult := (!totalResult |> List.append result.Value)
+            totalResult := (!totalResult |> List.append [result])
             expResult
         )
 
