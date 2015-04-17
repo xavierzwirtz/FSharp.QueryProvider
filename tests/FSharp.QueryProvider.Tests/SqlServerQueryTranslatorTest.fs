@@ -84,6 +84,44 @@ module QueryGenTest =
         AreEqualExpression q "SELECT * FROM Person WHERE (PersonName = @p1)" [
             {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ]
+
+
+    [<Test>]
+    let ``where local var``() =
+        
+        let f (name : string) =
+            let q = fun () -> 
+                query {
+                    for p in queryable<Person> do
+                    where(p.PersonName = name)
+                    select p
+                } :> obj
+        
+            AreEqualExpression q "SELECT * FROM Person WHERE (PersonName = @p1)" [
+                {Name="p1"; Value=name; DbType = System.Data.SqlDbType.NVarChar}
+            ]
+
+        f "john"
+        f "jane"
+
+    [<Test>]
+    let ``where local function applied``() =
+        
+        let f (gen : unit -> string) =
+            let q = fun () -> 
+                query {
+                    for p in queryable<Person> do
+                    where(p.PersonName = gen())
+                    select p
+                } :> obj
+        
+            AreEqualExpression q "SELECT * FROM Person WHERE (PersonName = @p1)" [
+                {Name="p1"; Value=gen(); DbType = System.Data.SqlDbType.NVarChar}
+            ]
+
+        f (fun () -> "john")
+        f (fun () -> "jane")
+
     [<Test>]
     let ``double where``() =
         let q = fun () -> 

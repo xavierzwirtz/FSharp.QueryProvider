@@ -121,9 +121,9 @@ module SqlServer =
                 | Some result -> 
                     Some(fst(result).Value, snd(result))
 
-            let constantToQueryAndParam (c : ConstantExpression) = 
+            let valueToQueryAndParam (value : obj) = 
                 let dbType = 
-                    match System.Type.GetTypeCode(c.Value.GetType()) with 
+                    match System.Type.GetTypeCode(value.GetType()) with 
                     | System.TypeCode.Boolean -> System.Data.SqlDbType.Bit
                     | System.TypeCode.String -> System.Data.SqlDbType.NVarChar
                     | System.TypeCode.DateTime -> System.Data.SqlDbType.DateTime2
@@ -131,12 +131,12 @@ module SqlServer =
                     | System.TypeCode.Int16 -> System.Data.SqlDbType.SmallInt
                     | System.TypeCode.Int32 -> System.Data.SqlDbType.Int
                     | System.TypeCode.Int64 -> System.Data.SqlDbType.BigInt
-                    | System.TypeCode.Object -> failwithf "The constant for '%A' is not supported" c.Value
+                    | System.TypeCode.Object -> failwithf "The constant for '%A' is not supported" value
                     | t -> failwithf "not implemented type '%s'" (t.ToString())
 
                 let p = {
                     PreparedParameter.Name = "p" + getColumnNameIndex().ToString()
-                    Value = c.Value
+                    Value = value
                     DbType = dbType
                 }
 
@@ -289,7 +289,7 @@ module SqlServer =
                     | None ->
                         match m.Method.Name with
                         | "Contains" | "StartsWith" | "EndsWith" as typeName when(m.Object.Type = typedefof<string>) ->
-                            let valQ, valP = constantToQueryAndParam(arg :?> ConstantExpression)
+                            let valQ, valP = valueToQueryAndParam ((arg :?> ConstantExpression).Value)
                             let search =
                                 match typeName with 
                                 | "Contains" -> ["'%' + "] @ valQ @ [" + '%'"]
@@ -299,6 +299,9 @@ module SqlServer =
                             let colQ, colP = map2(m.Object)
 
                             Some (colQ @ [" LIKE "] @ search, colP @ valP)
+                        | "Invoke" -> 
+                            let result = Expression.Lambda(m).Compile().DynamicInvoke()
+                            Some (valueToQueryAndParam(result))
                         | x -> failwithf "Method '%s' is not implemented." x
                 | Not n ->
                     let sql, parameters = map2(n.Operand)
@@ -325,7 +328,7 @@ module SqlServer =
                     else if c.Value = null then
                         Some (["NULL"] ,[])
                     else
-                        Some (constantToQueryAndParam c)
+                        Some (valueToQueryAndParam c.Value)
                 | MemberAccess m ->
                     if m.Expression <> null && m.Expression.NodeType = ExpressionType.Parameter then
                         Some ([m.Member.Name], [])
