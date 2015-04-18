@@ -18,8 +18,8 @@ let getExpression (f : unit -> obj) =
         try
             let r = f()
             match r with
-            | :? System.Linq.IQueryable<_> as q-> Some (q :> System.Linq.IQueryable)
-            | :? System.Linq.IQueryable as q-> Some q
+            //| :? System.Linq.IQueryable<_> as q -> Some (q :> System.Linq.IQueryable)
+            | :? System.Linq.IQueryable as q -> Some q
             | _ -> None
             //Some (r :?> System.Linq.IQueryable<_>)
         with 
@@ -177,6 +177,18 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT * FROM Employee WHERE (DepartmentId = @p1)" [
             {Name="p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
+        ]
+    [<Test>]
+    let ``where option none``() =
+        let q = fun () -> 
+            query {
+                for e in queryable<Employee>() do
+                where(e.DepartmentId = None)
+                select e
+            } :> obj
+        
+        AreEqualExpression q "SELECT * FROM Employee WHERE (DepartmentId = @p1)" [
+            {Name="p1"; Value=System.DBNull.Value; DbType = System.Data.SqlDbType.Int}
         ]
 
     [<Test>]

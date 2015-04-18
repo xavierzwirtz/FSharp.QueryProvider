@@ -68,38 +68,51 @@ module SqlServer =
         t.IsGenericType &&
         t.GetGenericTypeDefinition() = typedefof<Option<_>>
 
-    type ParamOrSqlDbType =
-    | Param of string list * PreparedParameter<System.Data.SqlDbType> list
+    type DbTypeOrObject =
+    | Object
     | SqlDbType of System.Data.SqlDbType
 
+    let typeToDbType (t : System.Type) =
+        match System.Type.GetTypeCode(t) with 
+        | System.TypeCode.Boolean -> SqlDbType System.Data.SqlDbType.Bit
+        | System.TypeCode.String -> SqlDbType System.Data.SqlDbType.NVarChar
+        | System.TypeCode.DateTime -> SqlDbType System.Data.SqlDbType.DateTime2
+        | System.TypeCode.Byte -> SqlDbType System.Data.SqlDbType.TinyInt
+        | System.TypeCode.Int16 -> SqlDbType System.Data.SqlDbType.SmallInt
+        | System.TypeCode.Int32 -> SqlDbType System.Data.SqlDbType.Int
+        | System.TypeCode.Int64 -> SqlDbType System.Data.SqlDbType.BigInt
+        | System.TypeCode.Object -> 
+            Object
+        | t -> failwithf "not implemented type '%s'" (t.ToString())
+
+    let createParameter columnIndex value dbType = 
+        let p = {
+            PreparedParameter.Name = "p" + columnIndex.ToString()
+            Value = value
+            DbType = dbType
+        }
+
+        ["@"; p.Name; ""], [p]
+
     let rec valueToQueryAndParam (columnIndex : int) (value : obj) = 
-        let dbType = 
-            let t = value.GetType()
-            match System.Type.GetTypeCode(t) with 
-            | System.TypeCode.Boolean -> SqlDbType System.Data.SqlDbType.Bit
-            | System.TypeCode.String -> SqlDbType System.Data.SqlDbType.NVarChar
-            | System.TypeCode.DateTime -> SqlDbType System.Data.SqlDbType.DateTime2
-            | System.TypeCode.Byte -> SqlDbType System.Data.SqlDbType.TinyInt
-            | System.TypeCode.Int16 -> SqlDbType System.Data.SqlDbType.SmallInt
-            | System.TypeCode.Int32 -> SqlDbType System.Data.SqlDbType.Int
-            | System.TypeCode.Int64 -> SqlDbType System.Data.SqlDbType.BigInt
-            | System.TypeCode.Object -> 
-                if t |> isOption then 
-                    Param (t.GetMethod("get_Value").Invoke(value, [||]) |> valueToQueryAndParam columnIndex)
-                else
-                    failwithf "The constant for '%A' is not supported" value
-            | t -> failwithf "not implemented type '%s'" (t.ToString())
+        let t = value.GetType()
 
+        let dbType = typeToDbType(t)
+      
         match dbType with
-        | Param(q, p) -> q, p
-        | SqlDbType dbType -> 
-            let p = {
-                PreparedParameter.Name = "p" + columnIndex.ToString()
-                Value = value
-                DbType = dbType
-            }
+        | Object ->
+            if t |> isOption then 
+                t.GetMethod("get_Value").Invoke(value, [||]) |> valueToQueryAndParam columnIndex
+            else
+                failwithf "The constant for '%A' is not supported" value
+        | SqlDbType dbType ->
+            createParameter columnIndex value dbType
 
-            ["@"; p.Name; ""], [p]
+    let createNull (columnIndex : int) (t : DbTypeOrObject) =
+        match t with
+        | Object -> failwith "this value cannot be object type"
+        | SqlDbType dbType ->
+            createParameter columnIndex System.DBNull.Value dbType
 
     let translate (expression : Expression) = 
         
@@ -121,6 +134,11 @@ module SqlServer =
         let getColumnNameIndex () = 
             columnNameUnique := (!columnNameUnique + 1)
             !columnNameUnique
+
+        let valueToQueryAndParam value =
+            valueToQueryAndParam (getColumnNameIndex()) value
+        let createNull value =
+            createNull (getColumnNameIndex()) value
 
         let rec mapFun e : ExpressionResult * (list<string> * list<PreparedParameter<_>>) = 
             let map = map(mapFun)
@@ -163,7 +181,6 @@ module SqlServer =
             let result : option<string list * PreparedParameter<_> list> = 
                 match e with
                 | Call m -> 
-                    let arg = m.Arguments.Item(0) 
                     let linqChain = getOperationsAndQueryable m
 
                     match linqChain with
@@ -328,7 +345,8 @@ module SqlServer =
                     | None ->
                         match m.Method.Name with
                         | "Contains" | "StartsWith" | "EndsWith" as typeName when(m.Object.Type = typedefof<string>) ->
-                            let valQ, valP = valueToQueryAndParam (getColumnNameIndex()) ((arg :?> ConstantExpression).Value)
+                            let arg = m.Arguments.Item(0) 
+                            let valQ, valP = valueToQueryAndParam ((arg :?> ConstantExpression).Value)
                             let search =
                                 match typeName with 
                                 | "Contains" -> ["'%' + "] @ valQ @ [" + '%'"]
@@ -339,9 +357,12 @@ module SqlServer =
 
                             Some (colQ @ [" LIKE "] @ search, colP @ valP)
                         | "Invoke" | "op_Dereference" -> 
-                            Some (invoke m |> valueToQueryAndParam (getColumnNameIndex()))
+                            Some (invoke m |> valueToQueryAndParam)
                         | "Some" when (isOption m.Method.ReturnType) -> 
-                            Some (invoke m |> valueToQueryAndParam (getColumnNameIndex()))
+                            Some (invoke m |> valueToQueryAndParam)
+                        | "get_None" when (isOption m.Method.ReturnType) -> 
+                            let t = m.Method.ReturnType.GetGenericArguments() |> Seq.head
+                            Some (createNull(t |> typeToDbType))
                         | x -> failwithf "Method '%s' is not implemented." x
                 | Not n ->
                     let sql, parameters = map2(n.Operand)
@@ -368,7 +389,7 @@ module SqlServer =
                     else if c.Value = null then
                         Some (["NULL"] ,[])
                     else
-                        Some (valueToQueryAndParam (getColumnNameIndex()) c.Value)
+                        Some (valueToQueryAndParam c.Value)
                 | MemberAccess m ->
                     if m.Expression <> null && m.Expression.NodeType = ExpressionType.Parameter then
                         Some ([m.Member.Name], [])
