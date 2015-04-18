@@ -1,9 +1,11 @@
-[![Issue Stats](http://issuestats.com/github/fsprojects/ProjectScaffold/badge/issue)](http://issuestats.com/github/fsprojects/ProjectScaffold)
-[![Issue Stats](http://issuestats.com/github/fsprojects/ProjectScaffold/badge/pr)](http://issuestats.com/github/fsprojects/ProjectScaffold)
+[![Issue Stats](http://issuestats.com/github/fsprojects/FSharp.QueryProvider/badge/issue)](http://issuestats.com/github/fsprojects/FSharp.QueryProvider)
+[![Issue Stats](http://issuestats.com/github/fsprojects/FSharp.QueryProvider/badge/pr)](http://issuestats.com/github/fsprojects/FSharp.QueryProvider)
 
-# ProjectScaffold
+# FSharp.QueryProvider
 
-This project can be used to scaffold a prototypical .NET solution including file system layout and tooling. This includes a build process that: 
+This project can be used to easily implement a database engine agnostic Linq
+Query Provider for an ORM. The goal is to create a generic query generation
+and object instantiation library that different ORM implementations can share.
 
 * updates all AssemblyInfo files
 * compiles the application and runs all test projects
@@ -24,8 +26,6 @@ Documentation: http://fsprojects.github.io/ProjectScaffold
 
 ## Maintainer(s)
 
-- [@forki](https://github.com/forki)
-- [@pblasucci](https://github.com/pblasucci)
-- [@sergey-tihon](https://github.com/sergey-tihon)
+- [@voiceofwisdom](https://github.com/voiceofwisdom)
 
 The default maintainer account for projects under "fsprojects" is [@fsgit](https://github.com/fsgit) - F# Community Project Incubation Space (repo management)
