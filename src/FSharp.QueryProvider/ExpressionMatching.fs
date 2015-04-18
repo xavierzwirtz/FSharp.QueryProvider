@@ -42,6 +42,20 @@ let (|Block|_|) (e : Expression) =
     compare e et.Block
 let (|Call|_|) (e : Expression) =
     compare e et.Call |> cast<MethodCallExpression>
+let (|CallIQueryable|_|) (e : Expression) =
+    match compare e et.Call |> cast<MethodCallExpression> with
+    | Some m -> 
+        if m.Arguments.Count > 0 then
+            let first = m.Arguments |> Seq.head 
+            if typedefof<System.Linq.IQueryable>.IsAssignableFrom first.Type then
+                let rest = m.Arguments |> Seq.skip(1)
+                Some (m, first, rest)
+            else
+                None
+        else 
+            None
+    | None -> None
+
 let (|Coalesce|_|) (e : Expression) =
     compare e et.Coalesce
 let (|Conditional|_|) (e : Expression) =

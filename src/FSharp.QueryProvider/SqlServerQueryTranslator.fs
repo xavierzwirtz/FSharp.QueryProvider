@@ -32,6 +32,75 @@ module SqlServer =
                     | _ -> acum @ toInsert @ [item]
                 ) []
 
+    let getLambda (m : MethodCallExpression) =
+            (stripQuotes (m.Arguments.Item(1))) :?> LambdaExpression
+
+    let (|SingleSameSelect|_|) (l : LambdaExpression) =
+        match l.Body with
+        | :? ParameterExpression as paramAccess -> 
+            let param = (l.Parameters |> Seq.exactlyOne)
+            if l.Parameters.Count = 1 && paramAccess.Type = param.Type then
+                Some param
+            else 
+                None
+        | _ -> None
+
+    let invoke (m : MethodCallExpression) = 
+        Expression.Lambda(m).Compile().DynamicInvoke()
+
+    let getMethod name (ml : MethodCallExpression list) = 
+        let m = ml |> List.tryFind(fun m -> m.Method.Name = name)
+        match m with
+        | Some m -> 
+            Some(m), (ml |> List.filter(fun ms -> ms <> m))
+        | None -> None, ml
+
+    let getMethods names (ml : MethodCallExpression list) = 
+        let methods = ml |> List.filter(fun m -> names |> List.exists(fun n -> m.Method.Name = n))
+        methods, (ml |> List.filter(fun ms -> methods |> List.forall(fun m -> m <> ms)))
+
+    let splitListOfTuples source = 
+        source |> List.fold(fun a b ->
+            fst(a) @ fst(b), snd(a) @ snd(b)
+        ) (List.empty, List.empty)
+
+    let isOption (t : System.Type) = 
+        t.IsGenericType &&
+        t.GetGenericTypeDefinition() = typedefof<Option<_>>
+
+    type ParamOrSqlDbType =
+    | Param of string list * PreparedParameter<System.Data.SqlDbType> list
+    | SqlDbType of System.Data.SqlDbType
+
+    let rec valueToQueryAndParam (columnIndex : int) (value : obj) = 
+        let dbType = 
+            let t = value.GetType()
+            match System.Type.GetTypeCode(t) with 
+            | System.TypeCode.Boolean -> SqlDbType System.Data.SqlDbType.Bit
+            | System.TypeCode.String -> SqlDbType System.Data.SqlDbType.NVarChar
+            | System.TypeCode.DateTime -> SqlDbType System.Data.SqlDbType.DateTime2
+            | System.TypeCode.Byte -> SqlDbType System.Data.SqlDbType.TinyInt
+            | System.TypeCode.Int16 -> SqlDbType System.Data.SqlDbType.SmallInt
+            | System.TypeCode.Int32 -> SqlDbType System.Data.SqlDbType.Int
+            | System.TypeCode.Int64 -> SqlDbType System.Data.SqlDbType.BigInt
+            | System.TypeCode.Object -> 
+                if t |> isOption then 
+                    Param (t.GetMethod("get_Value").Invoke(value, [||]) |> valueToQueryAndParam columnIndex)
+                else
+                    failwithf "The constant for '%A' is not supported" value
+            | t -> failwithf "not implemented type '%s'" (t.ToString())
+
+        match dbType with
+        | Param(q, p) -> q, p
+        | SqlDbType dbType -> 
+            let p = {
+                PreparedParameter.Name = "p" + columnIndex.ToString()
+                Value = value
+                DbType = dbType
+            }
+
+            ["@"; p.Name; ""], [p]
+
     let translate (expression : Expression) = 
         
 //        let mutable tableAliases = Map.empty<Expression, string>
@@ -53,38 +122,6 @@ module SqlServer =
             columnNameUnique := (!columnNameUnique + 1)
             !columnNameUnique
 
-        let getLambda (m : MethodCallExpression) =
-            (stripQuotes (m.Arguments.Item(1))) :?> LambdaExpression
-
-        let (|SingleSameSelect|_|) (l : LambdaExpression) =
-            match l.Body with
-            | :? ParameterExpression as paramAccess -> 
-                let param = (l.Parameters |> Seq.exactlyOne)
-                if l.Parameters.Count = 1 && paramAccess.Type = param.Type then
-                    Some param
-                else 
-                    None
-            | _ -> None
-
-//        let createSelect tableName columnList =
-//                ["SELECT "] @ columnList @ [" FROM "; tableName]
-
-        let getMethod name (ml : MethodCallExpression list) = 
-            let m = ml |> List.tryFind(fun m -> m.Method.Name = name)
-            match m with
-            | Some m -> 
-                Some(m), (ml |> List.filter(fun ms -> ms <> m))
-            | None -> None, ml
-
-        let getMethods names (ml : MethodCallExpression list) = 
-            let methods = ml |> List.filter(fun m -> names |> List.exists(fun n -> m.Method.Name = n))
-            methods, (ml |> List.filter(fun ms -> methods |> List.forall(fun m -> m <> ms)))
-
-        let splitListOfTuples source = 
-            source |> List.fold(fun a b ->
-                fst(a) @ fst(b), snd(a) @ snd(b)
-            ) (List.empty, List.empty)
-
         let rec mapFun e : ExpressionResult * (list<string> * list<PreparedParameter<_>>) = 
             let map = map(mapFun)
             let map2 = fun e ->
@@ -97,21 +134,23 @@ module SqlServer =
 
             let getOperationsAndQueryable e : option<IQueryable * MethodCallExpression list> =
                 let rec get (e : MethodCallExpression) : option<IQueryable option * MethodCallExpression list> = 
-                    let paramCount = e.Arguments.Count
-                    if paramCount = 0 then
-                        None
-                    else
-                        let first = (e.Arguments |> Seq.head)
-                        if typedefof<IQueryable>.IsAssignableFrom first.Type then
-                            match first with
-                            | Constant c -> Some(Some(c.Value :?> IQueryable), [e])
-                            | Call m -> 
-                                let r = get(m)
-                                match r with 
-                                | Some r -> 
-                                    Some (fst(r), snd(r) |> List.append([e]))
-                                | None -> None
-                            | x -> failwithf "not implemented nodetype '%A'" first.NodeType
+                    match e with
+                    | CallIQueryable(e, q, args) -> 
+                        match q with
+                        | Constant c -> Some(Some(c.Value :?> IQueryable), [e])
+                        | Call m -> 
+                            let r = get(m)
+                            match r with 
+                            | Some r -> 
+                                Some (fst(r), snd(r) |> List.append([e]))
+                            | None -> None
+                        | x -> failwithf "not implemented nodetype '%A'" q.NodeType
+                    | _ ->
+                        if e.Arguments.Count = 0 then
+                            if typedefof<IQueryable>.IsAssignableFrom e.Type then
+                                Some (Some (invoke(e) :?> IQueryable), [])
+                            else
+                                None
                         else
                             None
 
@@ -120,27 +159,6 @@ module SqlServer =
                 | None -> None
                 | Some result -> 
                     Some(fst(result).Value, snd(result))
-
-            let valueToQueryAndParam (value : obj) = 
-                let dbType = 
-                    match System.Type.GetTypeCode(value.GetType()) with 
-                    | System.TypeCode.Boolean -> System.Data.SqlDbType.Bit
-                    | System.TypeCode.String -> System.Data.SqlDbType.NVarChar
-                    | System.TypeCode.DateTime -> System.Data.SqlDbType.DateTime2
-                    | System.TypeCode.Byte -> System.Data.SqlDbType.TinyInt
-                    | System.TypeCode.Int16 -> System.Data.SqlDbType.SmallInt
-                    | System.TypeCode.Int32 -> System.Data.SqlDbType.Int
-                    | System.TypeCode.Int64 -> System.Data.SqlDbType.BigInt
-                    | System.TypeCode.Object -> failwithf "The constant for '%A' is not supported" value
-                    | t -> failwithf "not implemented type '%s'" (t.ToString())
-
-                let p = {
-                    PreparedParameter.Name = "p" + getColumnNameIndex().ToString()
-                    Value = value
-                    DbType = dbType
-                }
-
-                ["@"; p.Name; ""], [p]
 
             let result : option<string list * PreparedParameter<_> list> = 
                 match e with
@@ -237,12 +255,33 @@ module SqlServer =
                                 | _ -> 
                                     let wheres, parameters =
                                         wheres |> List.rev |> List.map(fun w ->
-                                            let lambda = getLambda(w)
-                                            let q, p = lambda.Body |> map2
-                                            [q], p
+                                            let b = getLambda(w).Body
+                                            let x = 
+                                                match b with 
+                                                | Call m when(m.Method.Name = "Contains") ->
+                                                    //(PersonId IN (SELECT PersonID FROM Employee))
+                                                    match m with 
+                                                    | CallIQueryable(m,q,rest) ->  
+                                                        let containsVal = rest |> Seq.head
+                                                        match containsVal with
+                                                        | MemberAccess a -> 
+                                                            let accessQ, accessP = a |> map2
+                                                            let subQ, subP = q |> map2
+                                                            Some ([accessQ @ [" IN ("] @ subQ @ [")"]], accessP @ subP)
+                                                        | _ -> 
+                                                            None
+                                                    | _ -> None
+                                                | b -> None
+                                            match x with
+                                            | None -> 
+                                                let q, p = b |> map2
+                                                [q], p
+                                            | Some x ->
+                                                x
                                         ) |> splitListOfTuples
                                     let sql = wheres |> List.interpolate [[" AND "]] |> List.reduce(@)
                                     Some (sql, parameters)
+
                             let fromContains =
                                 match contains with
                                 | Some c -> 
@@ -289,7 +328,7 @@ module SqlServer =
                     | None ->
                         match m.Method.Name with
                         | "Contains" | "StartsWith" | "EndsWith" as typeName when(m.Object.Type = typedefof<string>) ->
-                            let valQ, valP = valueToQueryAndParam ((arg :?> ConstantExpression).Value)
+                            let valQ, valP = valueToQueryAndParam (getColumnNameIndex()) ((arg :?> ConstantExpression).Value)
                             let search =
                                 match typeName with 
                                 | "Contains" -> ["'%' + "] @ valQ @ [" + '%'"]
@@ -299,9 +338,10 @@ module SqlServer =
                             let colQ, colP = map2(m.Object)
 
                             Some (colQ @ [" LIKE "] @ search, colP @ valP)
-                        | "Invoke" -> 
-                            let result = Expression.Lambda(m).Compile().DynamicInvoke()
-                            Some (valueToQueryAndParam(result))
+                        | "Invoke" | "op_Dereference" -> 
+                            Some (invoke m |> valueToQueryAndParam (getColumnNameIndex()))
+                        | "Some" when (isOption m.Method.ReturnType) -> 
+                            Some (invoke m |> valueToQueryAndParam (getColumnNameIndex()))
                         | x -> failwithf "Method '%s' is not implemented." x
                 | Not n ->
                     let sql, parameters = map2(n.Operand)
@@ -328,7 +368,7 @@ module SqlServer =
                     else if c.Value = null then
                         Some (["NULL"] ,[])
                     else
-                        Some (valueToQueryAndParam c.Value)
+                        Some (valueToQueryAndParam (getColumnNameIndex()) c.Value)
                 | MemberAccess m ->
                     if m.Expression <> null && m.Expression.NodeType = ExpressionType.Parameter then
                         Some ([m.Member.Name], [])

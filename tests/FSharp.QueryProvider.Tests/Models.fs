@@ -9,7 +9,8 @@ type Employee =
     { EmployeeId : int option
       EmployeeName : string option
       DepartmentId : int option
-      VersionNo : int option }
+      VersionNo : int option
+      PersonId : int }
 
 type Address =
     { AddressId : int

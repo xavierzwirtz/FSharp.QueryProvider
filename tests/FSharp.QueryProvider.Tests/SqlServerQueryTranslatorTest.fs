@@ -10,7 +10,7 @@ type Expression = System.Linq.Expressions.Expression
 
 let provider = EmptyQueryProvider.EmptyQueryProvider()
 
-let queryable<'T> = Queryable.Query(provider, None)
+let queryable<'T>() = Queryable.Query<'T>(provider, None)
 
 let getExpression (f : unit -> obj) = 
     let beforeCount = provider.Expressions |> Seq.length 
@@ -48,6 +48,9 @@ let AreEqualExpression get expectedSql (expectedParameters: list<PreparedParamet
     printfn "%s" (expression.ToString())
     let sqlQuery = SqlServer.translate expression
 
+    if expectedSql <> sqlQuery.Text then
+        printfn "query: %s" sqlQuery.Text
+
     Assert.AreEqual(expectedSql, sqlQuery.Text)
 
     let test a b = Seq.fold (&&) true (Seq.zip a b |> Seq.map (fun (aa,bb) -> aa=bb))
@@ -66,7 +69,7 @@ module QueryGenTest =
     let ``simple select``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 select p
             } :> obj
         
@@ -76,7 +79,7 @@ module QueryGenTest =
     let ``simple where``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john")
                 select p
             } :> obj
@@ -89,20 +92,17 @@ module QueryGenTest =
     [<Test>]
     let ``where local var``() =
         
-        let f (name : string) =
-            let q = fun () -> 
-                query {
-                    for p in queryable<Person> do
-                    where(p.PersonName = name)
-                    select p
-                } :> obj
+        let name = ref "john"
+        let q = fun () -> 
+            query {
+                for p in queryable<Person>() do
+                where(p.PersonName = !name)
+                select p
+            } :> obj
         
-            AreEqualExpression q "SELECT * FROM Person WHERE (PersonName = @p1)" [
-                {Name="p1"; Value=name; DbType = System.Data.SqlDbType.NVarChar}
-            ]
-
-        f "john"
-        f "jane"
+        AreEqualExpression q "SELECT * FROM Person WHERE (PersonName = @p1)" [
+            {Name="p1"; Value=(!name); DbType = System.Data.SqlDbType.NVarChar}
+        ]
 
     [<Test>]
     let ``where local function applied``() =
@@ -110,7 +110,7 @@ module QueryGenTest =
         let f (gen : unit -> string) =
             let q = fun () -> 
                 query {
-                    for p in queryable<Person> do
+                    for p in queryable<Person>() do
                     where(p.PersonName = gen())
                     select p
                 } :> obj
@@ -126,7 +126,7 @@ module QueryGenTest =
     let ``double where``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john")
                 where(p.PersonId = 5)
                 select p
@@ -141,7 +141,7 @@ module QueryGenTest =
     let ``where with single or``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john" || p.PersonName = "doe")
                 select p
             } :> obj
@@ -155,7 +155,7 @@ module QueryGenTest =
     let ``where with two or``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john" || p.PersonName = "doe" || p.PersonName = "james")
                 select p
             } :> obj
@@ -167,10 +167,23 @@ module QueryGenTest =
         ]
 
     [<Test>]
+    let ``where option some``() =
+        let q = fun () -> 
+            query {
+                for e in queryable<Employee>() do
+                where(e.DepartmentId = Some(1234))
+                select e
+            } :> obj
+        
+        AreEqualExpression q "SELECT * FROM Employee WHERE (DepartmentId = @p1)" [
+            {Name="p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
+        ]
+
+    [<Test>]
     let ``where string contains``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName.Contains("john"))
                 select p
             } :> obj
@@ -183,7 +196,7 @@ module QueryGenTest =
     let ``where string startswith``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName.StartsWith("john"))
                 select p
             } :> obj
@@ -196,7 +209,7 @@ module QueryGenTest =
     let ``where string endswith``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName.EndsWith("john"))
                 select p
             } :> obj
@@ -206,10 +219,63 @@ module QueryGenTest =
         ]
 
     [<Test>]
+    let ``where subquery contains id ``() =
+        let q = fun () -> 
+            query {
+                for p in queryable<Person>() do
+                where(query {
+                    for e in queryable<Employee>() do
+                    select e.PersonId
+                    contains p.PersonId
+                })
+                select p
+            } :> obj
+        
+        AreEqualExpression q "SELECT * FROM Person WHERE (PersonId IN (SELECT PersonId FROM Employee))" []
+
+    [<Test>]
+    let ``where subquery with where contains id ``() =
+        let q = fun () -> 
+            query {
+                for p in queryable<Person>() do
+                where(query {
+                    for e in queryable<Employee>() do
+                    where(e.DepartmentId = Some(1234))
+                    select e.PersonId
+                    contains p.PersonId
+                })
+                select p
+            } :> obj
+        
+        AreEqualExpression q "SELECT * FROM Person WHERE (PersonId IN (SELECT PersonId FROM Employee WHERE (DepartmentId = @p1)))" [
+            {Name="p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
+        ]
+
+    [<Test>]
+    let ``where subquery with where contains variable id``() =
+
+        let departmentId = ref 1234
+        let q = fun () -> 
+            query {
+                for p in queryable<Person>() do
+                where(query {
+                    for e in queryable<Employee>() do
+                    where(e.DepartmentId = Some(!departmentId))
+                    select e.PersonId
+                    contains p.PersonId
+                })
+                select p
+            } :> obj
+        
+        AreEqualExpression q "SELECT * FROM Person WHERE (PersonId IN (SELECT PersonId FROM Employee WHERE (DepartmentId = @p1)))" [
+            {Name="p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
+        ]
+
+    [<Test>]
     let ``partial select``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 select p.PersonName
             } :> obj
         
@@ -219,7 +285,7 @@ module QueryGenTest =
     let ``partial select with where``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john")
                 select p.PersonName
             } :> obj
@@ -236,7 +302,7 @@ module QueryGenTest =
 
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 select (p.PersonName, p.PersonId)
             } :> obj
         
@@ -246,7 +312,7 @@ module QueryGenTest =
     let ``count``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 count
             } :> obj
 
@@ -256,7 +322,7 @@ module QueryGenTest =
     let ``count where``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john")
                 count
             } :> obj
@@ -270,7 +336,7 @@ module QueryGenTest =
     let ``contains col``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 select p.PersonId
                 contains 11
             } :> obj
@@ -291,7 +357,7 @@ module QueryGenTest =
 
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 contains e
             } :> obj
 
@@ -313,7 +379,7 @@ module QueryGenTest =
     let ``contains where``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john")
                 select p.PersonId
                 contains 11
@@ -328,7 +394,7 @@ module QueryGenTest =
     let ``last throws``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 last
             } :> obj
         
@@ -341,7 +407,7 @@ module QueryGenTest =
     let ``lastOrDefault``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 lastOrDefault
             } :> obj
         
@@ -354,7 +420,7 @@ module QueryGenTest =
     let ``exactlyOne``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 exactlyOne
             } :> obj
         
@@ -364,7 +430,7 @@ module QueryGenTest =
     let ``exactlyOne where``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john")
                 exactlyOne
             } :> obj
@@ -377,7 +443,7 @@ module QueryGenTest =
     let ``exactlyOneOrDefault``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 exactlyOneOrDefault
             } :> obj
         
@@ -387,7 +453,7 @@ module QueryGenTest =
     let ``exactlyOneOrDefault where``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john")
                 exactlyOneOrDefault
             } :> obj
@@ -400,7 +466,7 @@ module QueryGenTest =
     let ``head``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 head
             } :> obj
         
@@ -410,7 +476,7 @@ module QueryGenTest =
     let ``head where``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john")
                 head
             } :> obj
@@ -423,7 +489,7 @@ module QueryGenTest =
     let ``headOrDefault``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 headOrDefault
             } :> obj
         
@@ -433,7 +499,7 @@ module QueryGenTest =
     let ``headOrDefault where``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john")
                 head
             } :> obj
@@ -444,7 +510,7 @@ module QueryGenTest =
     let ``minBy``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 minBy p.PersonId
             } :> obj
         
@@ -454,7 +520,7 @@ module QueryGenTest =
     let ``minBy where``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john")
                 minBy p.PersonId
             } :> obj
@@ -467,7 +533,7 @@ module QueryGenTest =
     let ``maxBy``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 maxBy p.PersonId
             } :> obj
         
@@ -477,7 +543,7 @@ module QueryGenTest =
     let ``maxBy where``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john")
                 maxBy p.PersonId
             } :> obj
@@ -492,7 +558,7 @@ module QueryGenTest =
 
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 groupBy p.JobKind into g
                 select (g, query { for x in g do count })
             } :> obj
@@ -504,7 +570,7 @@ module QueryGenTest =
     let ``groupBy select``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 groupBy p.JobKind into g
                 select g
             } :> obj
@@ -517,7 +583,7 @@ module QueryGenTest =
     let ``groupBy where select``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 where(p.PersonName = "john")
                 groupBy p.JobKind into g
                 select g
@@ -532,7 +598,7 @@ module QueryGenTest =
     let ``sortBy``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 sortBy p.PersonId
             } :> obj
             
@@ -542,7 +608,7 @@ module QueryGenTest =
     let ``sortBy thenBy``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 sortBy p.PersonId
                 thenBy p.PersonName
             } :> obj
@@ -553,7 +619,7 @@ module QueryGenTest =
     let ``sortBy thenByDescending``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 sortBy p.PersonId
                 thenByDescending p.PersonName
             } :> obj
@@ -564,7 +630,7 @@ module QueryGenTest =
     let ``sortBy where``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 sortBy p.PersonId
                 where(p.PersonName = "john")
             } :> obj
@@ -577,7 +643,7 @@ module QueryGenTest =
     let ``sortByDescending``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 sortByDescending p.PersonId
             } :> obj
             
@@ -587,7 +653,7 @@ module QueryGenTest =
     let ``sortByDescending thenBy``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 sortByDescending p.PersonId
                 thenBy p.PersonName
             } :> obj
@@ -598,7 +664,7 @@ module QueryGenTest =
     let ``sortByDescending thenByDescending``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 sortByDescending p.PersonId
                 thenByDescending p.PersonName
             } :> obj
@@ -609,7 +675,7 @@ module QueryGenTest =
     let ``sortByDescending where``() =
         let q = fun () -> 
             query {
-                for p in queryable<Person> do
+                for p in queryable<Person>() do
                 sortByDescending p.PersonId
                 where(p.PersonName = "john")
             } :> obj
