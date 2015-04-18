@@ -1,18 +1,31 @@
 ﻿namespace FSharp.QueryProvider.QueryTranslator
 
-type PreparedParameter<'T> =
-    {
-        Name : string
-        Value : obj 
-        DbType : 'T
-    }
+type PreparedParameter<'T> = {
+    Name : string
+    Value : obj 
+    DbType : 'T
+}
 
-type PreparedStatement<'P> =
-    {
-        Text : string
-        FormattedText : string
-        Parameters : PreparedParameter<'P> seq
-    }
+type MultiColumn = {
+    ConstructorArgs : int seq
+    PropertySets : (int * System.Reflection.PropertyInfo) seq
+}
+
+type SingleOrMultiColumn =
+| Single of int
+| Multi of MultiColumn
+
+type ConstructionInfo = {
+    Type : System.Type
+    SingleOrMulti : SingleOrMultiColumn
+}
+
+type PreparedStatement<'P> = {
+    Text : string
+    FormattedText : string
+    Parameters : PreparedParameter<'P> seq
+    ConstructionInfo : ConstructionInfo seq
+}
 
 type IQueryable = System.Linq.IQueryable
 type IQueryable<'T> = System.Linq.IQueryable<'T>
@@ -60,9 +73,16 @@ module SqlServer =
         methods, (ml |> List.filter(fun ms -> methods |> List.forall(fun m -> m <> ms)))
 
     let splitListOfTuples source = 
+        let fst = function
+            | x, _, _ -> x
+        let snd = function
+            | _, x, _ -> x
+        let third = function
+            | _, _, x -> x
+
         source |> List.fold(fun a b ->
-            fst(a) @ fst(b), snd(a) @ snd(b)
-        ) (List.empty, List.empty)
+            fst(a) @ fst(b), snd(a) @ snd(b), third(a) @ third(b)
+        ) (List.empty, List.empty, List.empty)
 
     let isOption (t : System.Type) = 
         t.IsGenericType &&
@@ -92,7 +112,7 @@ module SqlServer =
             DbType = dbType
         }
 
-        ["@"; p.Name; ""], [p]
+        ["@"; p.Name; ""], [p], List.empty<ConstructionInfo>
 
     let rec valueToQueryAndParam (columnIndex : int) (value : obj) = 
         let t = value.GetType()
@@ -113,6 +133,34 @@ module SqlServer =
         | Object -> failwith "this value cannot be object type"
         | SqlDbType dbType ->
             createParameter columnIndex System.DBNull.Value dbType
+
+    let createSelect (selectIndex : int) (t : System.Type) : string list * ConstructionInfo * int=
+        // need to call a function here so that this can be extended
+        if Microsoft.FSharp.Reflection.FSharpType.IsRecord t then
+            let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields t |> Seq.toList
+
+            let ctorArgs = fields |> List.mapi(fun i f ->
+                selectIndex + i
+            )
+
+            let query = 
+                fields 
+                |> List.map(fun  f -> f.Name) 
+                |> List.interpolate([", "])
+                
+            let query = query @ [" "]
+
+            let multi = {
+                ConstructorArgs = ctorArgs
+                PropertySets = []
+            }
+
+            query, {
+                Type = t
+                SingleOrMulti = Multi multi
+            }, selectIndex + Seq.length(fields)
+        else
+            failwith "not implemented, only records are currently implemented"
 
     let translate (expression : Expression) = 
         
@@ -135,20 +183,28 @@ module SqlServer =
             columnNameUnique := (!columnNameUnique + 1)
             !columnNameUnique
 
+        let selectIndex = ref 0
+
+        let incrementSelectIndex amount = 
+            selectIndex := (!selectIndex + amount)
+
+        let getSelectIndex() = 
+            incrementSelectIndex 1
+            !selectIndex
+
         let valueToQueryAndParam value =
             valueToQueryAndParam (getColumnNameIndex()) value
         let createNull value =
             createNull (getColumnNameIndex()) value
 
-        let rec mapFun e : ExpressionResult * (list<string> * list<PreparedParameter<_>>) = 
-            let map = map(mapFun)
-            let map2 = fun e ->
-                map e |> splitListOfTuples
+        let rec mapFun e : ExpressionResult * (string list * PreparedParameter<_> list * ConstructionInfo list) = 
+            let map = fun e ->
+                map(mapFun) e |> splitListOfTuples
                 
             let bin (e : BinaryExpression) (text : string) = 
-                let leftSql, leftParams = map2(e.Left)
-                let rightSql, rightParams = map2(e.Right)
-                Some (leftSql @ [" "; text; " "] @ rightSql, leftParams @ rightParams)
+                let leftSql, leftParams, leftCtor = map(e.Left)
+                let rightSql, rightParams, rightCtor = map(e.Right)
+                Some (leftSql @ [" "; text; " "] @ rightSql, leftParams @ rightParams, leftCtor @ rightCtor)
 
             let getOperationsAndQueryable e : option<IQueryable * MethodCallExpression list> =
                 let rec get (e : MethodCallExpression) : option<IQueryable option * MethodCallExpression list> = 
@@ -178,7 +234,7 @@ module SqlServer =
                 | Some result -> 
                     Some(fst(result).Value, snd(result))
 
-            let result : option<string list * PreparedParameter<_> list> = 
+            let result : option<string list * PreparedParameter<_> list * ConstructionInfo list>= 
                 match e with
                 | Call m -> 
                     let linqChain = getOperationsAndQueryable m
@@ -222,27 +278,43 @@ module SqlServer =
                             failwith "'lastOrDefault' operator has no translations for Sql Server"
 
                         let star = ["* "], []
-                        let selectColumn, selectParameters = 
+                        let selectColumn, selectParameters, constructorInfo = 
                             match count with
-                            | Some c-> ["COUNT(*) "], []  //not fully implemented
+                            | Some c-> 
+                                ["COUNT(*) "], [], [
+                                    {
+                                        Type = typedefof<int>
+                                        SingleOrMulti = Single(getSelectIndex())
+                                    }
+                                ]
                             | None -> 
                                 match contains with 
                                 | Some c -> 
-                                    ["CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END "], []
+                                    ["CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END "], [] , [
+                                        {
+                                            Type = typedefof<bool>
+                                            SingleOrMulti = Single(getSelectIndex())
+                                        }
+                                    ]
                                 | None -> 
                                     match maxOrMin with 
                                     | Some m ->
-                                        let q, p = (getLambda(m).Body |> map2) 
-                                        q @ [" "], p
+                                        failwith "not implemented, need to implement the construction info"
+//                                        let q, p = (getLambda(m).Body |> map) 
+//                                        q @ [" "], p
                                     | None -> 
                                         match select with
                                         | Some s->
                                             match getLambda(s) with
-                                            | SingleSameSelect _ -> star
+                                            | SingleSameSelect x -> 
+                                                let query, ctor, indexChange = createSelect (getSelectIndex()) x.Type
+                                                incrementSelectIndex indexChange
+                                                query, [], [ctor]
                                             | l -> 
-                                                let q, p = (getLambda(m).Body |> map2) 
-                                                q @ [" "], p
-                                        | None -> star
+                                                failwith "not implemented, need to implement the construction info"
+//                                                let q, p = (getLambda(m).Body |> map) 
+//                                                q @ [" "], p
+                                        | None -> failwith "not implemented, need to call createSelect with the type" //star
 
                         let topStatement = 
                             let count = 
@@ -265,12 +337,12 @@ module SqlServer =
                             let table = queryable.ElementType.Name
                             ["SELECT " ] @ topStatement @ selectColumn @ ["FROM "; table]
 
-                        let whereClause, whereParameters =
+                        let whereClause, whereParameters, whereCtor =
                             let fromWhere = 
                                 match wheres with
                                 | [] -> None
                                 | _ -> 
-                                    let wheres, parameters =
+                                    let wheres, parameters, ctors =
                                         wheres |> List.rev |> List.map(fun w ->
                                             let b = getLambda(w).Body
                                             let x = 
@@ -282,29 +354,29 @@ module SqlServer =
                                                         let containsVal = rest |> Seq.head
                                                         match containsVal with
                                                         | MemberAccess a -> 
-                                                            let accessQ, accessP = a |> map2
-                                                            let subQ, subP = q |> map2
-                                                            Some ([accessQ @ [" IN ("] @ subQ @ [")"]], accessP @ subP)
+                                                            let accessQ, accessP, accessCtor = a |> map
+                                                            let subQ, subP, subCtor = q |> map
+                                                            Some ([accessQ @ [" IN ("] @ subQ @ [")"]], accessP @ subP, accessCtor @ subCtor)
                                                         | _ -> 
                                                             None
                                                     | _ -> None
                                                 | b -> None
                                             match x with
                                             | None -> 
-                                                let q, p = b |> map2
-                                                [q], p
+                                                let q, p, c = b |> map
+                                                [q], p, c
                                             | Some x ->
                                                 x
                                         ) |> splitListOfTuples
                                     let sql = wheres |> List.interpolate [[" AND "]] |> List.reduce(@)
-                                    Some (sql, parameters)
+                                    Some (sql, parameters, ctors)
 
                             let fromContains =
                                 match contains with
                                 | Some c -> 
-                                    let x, xp = getLambda(select.Value).Body |> map2
-                                    let y, yp= c.Arguments.Item(1) |> map2
-                                    Some (x @ [" = "] @ y, xp @ yp)
+                                    let xq, xp, xc = getLambda(select.Value).Body |> map
+                                    let yq, yp, yc = c.Arguments.Item(1) |> map
+                                    Some (xq @ [" = "] @ yq, xp @ yp, xc @ yc)
                                 | None -> None
 
                             let total = 
@@ -312,17 +384,17 @@ module SqlServer =
                                 | None, None -> None
                                 | Some w, None -> Some w
                                 | None, Some c -> Some c
-                                | Some(w,wp), Some(c,cp) -> Some(w @ [" AND "] @ c, wp @ cp)
+                                | Some(wq,wp,wc), Some(cq,cp,cc) -> Some(wq @ [" AND "] @ cq, wp @ cp, wc @ cc)
 
                             match total with 
-                            | None -> [], []
-                            | Some (q, qp) -> [" WHERE ("] @ q @ [")"], qp
+                            | None -> [], [], []
+                            | Some (q, qp, qc) -> [" WHERE ("] @ q @ [")"], qp, qc
 
-                        let orderByClause, orderByParameters =
+                        let orderByClause, orderByParameters, orderByCtor =
                             match sorts with
-                            | [] -> [], []
+                            | [] -> [], [], []
                             | _ ->
-                                let colSorts, parameters = 
+                                let colSorts, parameters, ctor = 
                                     sorts |> List.rev |> List.map(fun s ->
                                         let sortMethod = 
                                             match s.Method.Name with
@@ -330,32 +402,33 @@ module SqlServer =
                                             | "Max" | "OrderByDescending" | "ThenByDescending" -> "DESC"
                                             | n -> failwithf "Sort methods not implemented '%s'" n
                                         let lambda = getLambda(s)
-                                        let sql, parameters = (lambda.Body |> map2)
-                                        [sql @ [" "; sortMethod]], parameters
+                                        let sql, parameters, ctor = (lambda.Body |> map)
+                                        [sql @ [" "; sortMethod]], parameters, ctor
                                     ) |> splitListOfTuples
 
                                 //let colSorts = colSorts |> List.interpolate [", "]
                                 let colSorts = colSorts |> List.interpolate [[", "]] |> List.reduce(@)
 
-                                [" ORDER BY "] @ colSorts, parameters
+                                [" ORDER BY "] @ colSorts, parameters, ctor
 
                         let sql = selectStatement @ whereClause @ orderByClause
                         let parameters = orderByParameters @ whereParameters
-                        Some (sql, parameters)
+                        let ctor = orderByCtor @ whereCtor
+                        Some (sql, parameters, ctor)
                     | None ->
                         match m.Method.Name with
                         | "Contains" | "StartsWith" | "EndsWith" as typeName when(m.Object.Type = typedefof<string>) ->
                             let arg = m.Arguments.Item(0) 
-                            let valQ, valP = valueToQueryAndParam ((arg :?> ConstantExpression).Value)
+                            let valQ, valP, valC = valueToQueryAndParam ((arg :?> ConstantExpression).Value)
                             let search =
                                 match typeName with 
                                 | "Contains" -> ["'%' + "] @ valQ @ [" + '%'"]
                                 | "StartsWith" -> valQ @ [" + '%'"]
                                 | "EndsWith" -> ["'%' + "] @ valQ
                                 | _ -> failwithf "not implemented %s" typeName
-                            let colQ, colP = map2(m.Object)
+                            let colQ, colP, colC = map(m.Object)
 
-                            Some (colQ @ [" LIKE "] @ search, colP @ valP)
+                            Some (colQ @ [" LIKE "] @ search, colP @ valP, colC @ valC)
                         | "Invoke" | "op_Dereference" -> 
                             Some (invoke m |> valueToQueryAndParam)
                         | "Some" when (isOption m.Method.ReturnType) -> 
@@ -365,8 +438,8 @@ module SqlServer =
                             Some (createNull(t |> typeToDbType))
                         | x -> failwithf "Method '%s' is not implemented." x
                 | Not n ->
-                    let sql, parameters = map2(n.Operand)
-                    Some ([" NOT "] @ sql, parameters) 
+                    let sql, parameters, ctor = map(n.Operand)
+                    Some ([" NOT "] @ sql, parameters, ctor) 
                 | And e -> bin e "AND"
                 | AndAlso e -> bin e "AND"
                 | Or e -> bin e "OR"
@@ -387,19 +460,19 @@ module SqlServer =
                         failwith "dont think this should ever get hit"
                         //Some ["SELECT * FROM "; q.ElementType.Name]
                     else if c.Value = null then
-                        Some (["NULL"] ,[])
+                        Some (["NULL"] ,[], [])
                     else
                         Some (valueToQueryAndParam c.Value)
                 | MemberAccess m ->
                     if m.Expression <> null && m.Expression.NodeType = ExpressionType.Parameter then
-                        Some ([m.Member.Name], [])
+                        Some ([m.Member.Name], [], [])
                     else
                         failwithf "The member '%s' is not supported" m.Member.Name
                 | _ -> None
 
             match result with
             | Some r -> ExpressionResult.Skip, r
-            | None -> ExpressionResult.Recurse, ([], [])
+            | None -> ExpressionResult.Recurse, ([], [], [])
 //            if result.IsSome then 
 //                ExpressionResult.Skip, result
 //            else
@@ -409,7 +482,7 @@ module SqlServer =
             expression
             |> map(mapFun)
 
-        let queryList, queryParameters =  results |> splitListOfTuples
+        let queryList, queryParameters, constructionInfo =  results |> splitListOfTuples
 
         let query = queryList |> String.concat("")
 
@@ -417,4 +490,5 @@ module SqlServer =
             PreparedStatement.Text = query
             FormattedText = query
             Parameters = queryParameters //Seq.empty<PreparedParameter<System.Data.SqlDbType>>
+            ConstructionInfo = constructionInfo
         }
