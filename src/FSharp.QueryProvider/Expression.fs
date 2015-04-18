@@ -23,11 +23,21 @@ let rec stripQuotes (expression : Expression) =
     else 
         expression
 
+/// <summary>
+/// Walks an expression tree, replacing nodes.
+/// </summary>
+/// <param name="transform"></param>
+/// <param name="expression"></param>
 let rec visit transform (expression : Expression)  =
     
     let visitor = Visitor(transform)
     visitor.Visit expression
 
+/// <summary>
+/// Walks an expression tree and generates a list<'t>
+/// </summary>
+/// <param name="mapping"></param>
+/// <param name="expression"></param>
 let rec map (mapping : Expression -> ExpressionResult * 't) (expression : Expression) : 't list =
     
     let totalResult = ref List.empty<'t>
@@ -42,3 +52,6 @@ let rec map (mapping : Expression -> ExpressionResult * 't) (expression : Expres
     visitor.Visit expression |> ignore
 
     !totalResult
+
+//let rec partialEvaluate expression = 
+//    expression 

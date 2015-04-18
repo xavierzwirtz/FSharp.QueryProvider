@@ -31,4 +31,23 @@ let ``map``() =
         map(fun e -> Recurse, e.NodeType.ToString() ) source
         |> String.concat(",")
     Assert.AreEqual("Constant,Constant,Add", result)
-    //let
+
+//[<Test>]
+//let ``partialEvaluate``() =
+//    let localVal =  "local"
+//    let x = 
+//        <@ 
+//        let captured = localVal
+//        captured
+//        @>
+//
+//    let e = Microsoft.FSharp.Linq.RuntimeHelpers.LeafExpressionConverter.QuotationToExpression x
+//
+//    printfn "%A" e
+//    let source = Expression.Add(Expression.Constant(2), Expression.Constant(2))
+//    ignore()
+//
+//    let result = 
+//        map(fun e -> Recurse, e.NodeType.ToString() ) source
+//        |> String.concat(",")
+//    Assert.AreEqual("Constant,Constant,Add", result)
