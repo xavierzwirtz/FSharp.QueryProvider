@@ -46,8 +46,8 @@ module TypeSystem =
         let ienum = findIEnumerable(seqType)
         match ienum with 
         | None -> seqType
-        | Some(ienum) -> 
-            ienum.GetGenericArguments() |> Seq.head
+        | Some(ienum) ->  ienum
+            //ienum.GetGenericArguments() |> Seq.head
 
 
 type Query<'T>(provider : QueryProvider, expression : Expression option) as this = 

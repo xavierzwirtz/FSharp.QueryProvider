@@ -53,5 +53,10 @@ let rec map (mapping : Expression -> ExpressionResult * 't) (expression : Expres
 
     !totalResult
 
-//let rec partialEvaluate expression = 
-//    expression 
+/// <summary>
+/// Walks an expression tree and generates a list<'t> while also passing data<'d> down
+/// </summary>
+/// <param name="mapping"></param>
+/// <param name="expression"></param>
+let rec mapd (mapping : 'd -> Expression -> ExpressionResult * 't) (data : 'd) (expression : Expression) : 't list =
+    map (mapping data) expression

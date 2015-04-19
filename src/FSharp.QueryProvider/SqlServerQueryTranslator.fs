@@ -1,23 +1,17 @@
 ﻿namespace FSharp.QueryProvider.QueryTranslator
 
+open FSharp.QueryProvider
+
 type PreparedParameter<'T> = {
     Name : string
     Value : obj 
     DbType : 'T
 }
 
-type MultiColumn = {
-    ConstructorArgs : int seq
-    PropertySets : (int * System.Reflection.PropertyInfo) seq
-}
-
-type SingleOrMultiColumn =
-| Single of int
-| Multi of MultiColumn
-
 type ConstructionInfo = {
     Type : System.Type
-    SingleOrMulti : SingleOrMultiColumn
+    ConstructorArgs : int seq
+    PropertySets : (int * System.Reflection.PropertyInfo) seq
 }
 
 type PreparedStatement<'P> = {
@@ -44,6 +38,11 @@ module SqlServer =
                     | [] -> [item]
                     | _ -> acum @ toInsert @ [item]
                 ) []
+
+    type private Context = {
+        TableAlias : string list option
+        TopSelect : bool
+    }
 
     let getLambda (m : MethodCallExpression) =
             (stripQuotes (m.Arguments.Item(1))) :?> LambdaExpression
@@ -72,7 +71,7 @@ module SqlServer =
         let methods = ml |> List.filter(fun m -> names |> List.exists(fun n -> m.Method.Name = n))
         methods, (ml |> List.filter(fun ms -> methods |> List.forall(fun m -> m <> ms)))
 
-    let splitListOfTuples source = 
+    let splitResults source = 
         let fst = function
             | x, _, _ -> x
         let snd = function
@@ -81,7 +80,9 @@ module SqlServer =
             | _, _, x -> x
 
         source |> List.fold(fun a b ->
-            fst(a) @ fst(b), snd(a) @ snd(b), third(a) @ third(b)
+            fst(a) @ fst(b), 
+            snd(a) @ snd(b), 
+            third(a) @ third(b)
         ) (List.empty, List.empty, List.empty)
 
     let isOption (t : System.Type) = 
@@ -134,49 +135,80 @@ module SqlServer =
         | SqlDbType dbType ->
             createParameter columnIndex System.DBNull.Value dbType
 
-    let createSelect (selectIndex : int) (t : System.Type) : string list * ConstructionInfo * int=
+
+//    let createConstructionInfoExplicitFields (fields : System.Reflection.PropertyInfo seq) selectIndex (t : System.Type) =
+//        let ctorArgs = fields |> Seq.mapi(fun i f ->
+//            selectIndex + i
+//        )
+//
+//        {
+//            Type = t
+//            ConstructorArgs = ctorArgs
+//            PropertySets = []
+//        }
+
+    //terible duplication of code between this and createTypeSelect. needs to be refactored.
+    let createConstructionInfo selectIndex (t : System.Type) =
+        if Microsoft.FSharp.Reflection.FSharpType.IsRecord t then
+            let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields t |> Seq.toList
+
+            let ctorArgs = fields |> Seq.mapi(fun i f ->
+                selectIndex + i
+            )
+
+            {
+                Type = t
+                ConstructorArgs = ctorArgs
+                PropertySets = []
+            }, Seq.length(fields) 
+        else
+            let x = typedefof<int>
+            let simple () = 
+                {
+                    Type = t
+                    ConstructorArgs = [selectIndex] 
+                    PropertySets = []
+                }, 1
+            let simpleTypes = [
+                typedefof<int16>
+                typedefof<int>
+                typedefof<int64>
+                typedefof<float>
+                typedefof<decimal>
+                typedefof<string>
+                typedefof<System.DateTime>
+                typedefof<bool>
+            ]
+            if simpleTypes |> List.exists ((=) t) then
+                simple()
+            else
+                failwith "not implemented type '%s'" t.Name
+
+    let createTypeSelect (tableAlias : string list) (selectIndex : int) (topSelect : bool) (t : System.Type) =
         // need to call a function here so that this can be extended
         if Microsoft.FSharp.Reflection.FSharpType.IsRecord t then
             let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields t |> Seq.toList
 
-            let ctorArgs = fields |> List.mapi(fun i f ->
-                selectIndex + i
-            )
-
             let query = 
                 fields 
-                |> List.map(fun  f -> f.Name) 
-                |> List.interpolate([", "])
-                
+                |> List.map(fun  f -> tableAlias @ ["."; f.Name]) 
+                |> List.interpolate([[", "]])
+                |> List.reduce(@)
+
             let query = query @ [" "]
 
-            let multi = {
-                ConstructorArgs = ctorArgs
-                PropertySets = []
-            }
+            let ctor = 
+                if topSelect then
+                    Some (fst(createConstructionInfo selectIndex t))
+                else
+                    None
 
-            query, {
-                Type = t
-                SingleOrMulti = Multi multi
-            }, selectIndex + Seq.length(fields)
+            query, ctor, Seq.length(fields)
         else
             failwith "not implemented, only records are currently implemented"
 
     let translate (expression : Expression) = 
         
-//        let mutable tableAliases = Map.empty<Expression, string>
-//        let mutable tableAliasIndex = 0
-//
-//        let getTableAlias (table : 't IQueryable) : string = 
-//            let existing = tableAliases |> Map.tryFind table
-//            if existing.IsNone then
-//                tableAliasIndex <- (tableAliasIndex + 1)
-//                let created = "T" + tableAliasIndex.ToString
-//                tableAliases |> Map.add table created
-//            else
-//                existing.Value
-//            //if existing.
-
         let columnNameUnique = ref 0
 
         let getColumnNameIndex () = 
@@ -188,19 +220,40 @@ module SqlServer =
         let incrementSelectIndex amount = 
             selectIndex := (!selectIndex + amount)
 
-        let getSelectIndex() = 
-            incrementSelectIndex 1
-            !selectIndex
+        let tableAliasIndex = ref 1
 
-        let valueToQueryAndParam value =
-            valueToQueryAndParam (getColumnNameIndex()) value
-        let createNull value =
-            createNull (getColumnNameIndex()) value
-
-        let rec mapFun e : ExpressionResult * (string list * PreparedParameter<_> list * ConstructionInfo list) = 
+        let getTableAlias () = 
+            let a = 
+                match !tableAliasIndex with
+                | 1 -> ["T"]
+                | i -> ["T"; i.ToString()]
+            tableAliasIndex := (!tableAliasIndex + 1)
+            a
+        
+        let rec mapFun (context : Context) e : ExpressionResult * (string list * PreparedParameter<_> list * ConstructionInfo list) = 
+            let mapd = fun context e ->
+                mapd(mapFun) context e |> splitResults
             let map = fun e ->
-                map(mapFun) e |> splitListOfTuples
-                
+                mapd context e
+
+            let valueToQueryAndParam value = 
+                valueToQueryAndParam (getColumnNameIndex()) value
+            let createNull value = 
+                createNull (getColumnNameIndex()) value
+            let createTypeSelect tableAlias t = 
+                let q, ctorOption, columnIndex = createTypeSelect tableAlias (!selectIndex) context.TopSelect t
+                incrementSelectIndex columnIndex
+                let c = 
+                    match ctorOption with
+                    | None -> []
+                    | Some c -> [c]
+                q, [], c
+
+            let createConstructionInfo t = 
+                let ctor, i = createConstructionInfo !selectIndex t
+                incrementSelectIndex i
+                ctor
+
             let bin (e : BinaryExpression) (text : string) = 
                 let leftSql, leftParams, leftCtor = map(e.Left)
                 let rightSql, rightParams, rightCtor = map(e.Right)
@@ -277,45 +330,48 @@ module SqlServer =
                         if lastOrDefault.IsSome then
                             failwith "'lastOrDefault' operator has no translations for Sql Server"
 
+                        let tableAlias = (getTableAlias())
+                        let map e = 
+                            mapd {TableAlias = Some tableAlias; TopSelect = false} e
+                        let createTypeSelect t =
+                            createTypeSelect tableAlias t
+
                         let star = ["* "], []
-                        let selectColumn, selectParameters, constructorInfo = 
+                        let selectColumn, selectParameters, selectCtor = 
                             match count with
                             | Some c-> 
-                                ["COUNT(*) "], [], [
-                                    {
-                                        Type = typedefof<int>
-                                        SingleOrMulti = Single(getSelectIndex())
-                                    }
-                                ]
+                                ["COUNT(*) "], [], [createConstructionInfo typedefof<int>]
                             | None -> 
                                 match contains with 
                                 | Some c -> 
-                                    ["CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END "], [] , [
-                                        {
-                                            Type = typedefof<bool>
-                                            SingleOrMulti = Single(getSelectIndex())
-                                        }
-                                    ]
+                                    ["CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END "], [] , [createConstructionInfo typedefof<bool>]
                                 | None -> 
+                                    let partialSelect (l : LambdaExpression) =
+                                        let t = l.ReturnType
+                                        let c = 
+                                            if context.TopSelect then
+                                                [createConstructionInfo t]
+                                            else
+                                                []
+                                        let q, p, _ = (getLambda(m).Body |> map) 
+                                        q @ [" "], p, c
                                     match maxOrMin with 
                                     | Some m ->
-                                        failwith "not implemented, need to implement the construction info"
-//                                        let q, p = (getLambda(m).Body |> map) 
-//                                        q @ [" "], p
+                                        partialSelect (getLambda m)
                                     | None -> 
                                         match select with
                                         | Some s->
                                             match getLambda(s) with
                                             | SingleSameSelect x -> 
-                                                let query, ctor, indexChange = createSelect (getSelectIndex()) x.Type
-                                                incrementSelectIndex indexChange
-                                                query, [], [ctor]
-                                            | l -> 
-                                                failwith "not implemented, need to implement the construction info"
-//                                                let q, p = (getLambda(m).Body |> map) 
-//                                                q @ [" "], p
-                                        | None -> failwith "not implemented, need to call createSelect with the type" //star
-
+                                                createTypeSelect x.Type
+                                            | l ->
+                                                partialSelect l
+                                        | None -> 
+//                                            match wheres with 
+//                                            | [] -> failwith "cannot determine type" //star
+//                                            | _ -> 
+//                                                let f = wheres |> Seq.head
+                                            createTypeSelect (Queryable.TypeSystem.getElementType (queryable.GetType()))
                         let topStatement = 
                             let count = 
                                 if single.IsSome || singleOrDefault.IsSome then
@@ -335,7 +391,7 @@ module SqlServer =
 
                         let selectStatement =
                             let table = queryable.ElementType.Name
-                            ["SELECT " ] @ topStatement @ selectColumn @ ["FROM "; table]
+                            ["SELECT " ] @ topStatement @ selectColumn @ ["FROM "; table; " AS "; ] @ tableAlias
 
                         let whereClause, whereParameters, whereCtor =
                             let fromWhere = 
@@ -367,7 +423,7 @@ module SqlServer =
                                                 [q], p, c
                                             | Some x ->
                                                 x
-                                        ) |> splitListOfTuples
+                                        ) |> splitResults
                                     let sql = wheres |> List.interpolate [[" AND "]] |> List.reduce(@)
                                     Some (sql, parameters, ctors)
 
@@ -404,7 +460,7 @@ module SqlServer =
                                         let lambda = getLambda(s)
                                         let sql, parameters, ctor = (lambda.Body |> map)
                                         [sql @ [" "; sortMethod]], parameters, ctor
-                                    ) |> splitListOfTuples
+                                    ) |> splitResults
 
                                 //let colSorts = colSorts |> List.interpolate [", "]
                                 let colSorts = colSorts |> List.interpolate [[", "]] |> List.reduce(@)
@@ -412,8 +468,8 @@ module SqlServer =
                                 [" ORDER BY "] @ colSorts, parameters, ctor
 
                         let sql = selectStatement @ whereClause @ orderByClause
-                        let parameters = orderByParameters @ whereParameters
-                        let ctor = orderByCtor @ whereCtor
+                        let parameters = orderByParameters @ whereParameters @ selectParameters
+                        let ctor = orderByCtor @ whereCtor @ selectCtor
                         Some (sql, parameters, ctor)
                     | None ->
                         match m.Method.Name with
@@ -464,8 +520,12 @@ module SqlServer =
                     else
                         Some (valueToQueryAndParam c.Value)
                 | MemberAccess m ->
+//                    failwith "should be handled explicitly"
                     if m.Expression <> null && m.Expression.NodeType = ExpressionType.Parameter then
-                        Some ([m.Member.Name], [], [])
+                        //this needs to call a function to determine column name for extensibility.    
+                        match context.TableAlias with
+                        | Some tableAlias -> Some (tableAlias @ ["."; m.Member.Name], [], [])
+                        | None -> failwith "cannot access member without tablealias being genned"
                     else
                         failwithf "The member '%s' is not supported" m.Member.Name
                 | _ -> None
@@ -480,9 +540,9 @@ module SqlServer =
 
         let results = 
             expression
-            |> map(mapFun)
+            |> mapd(mapFun) ({TableAlias = None; TopSelect = true})
 
-        let queryList, queryParameters, constructionInfo =  results |> splitListOfTuples
+        let queryList, queryParameters, constructionInfo =  results |> splitResults
 
         let query = queryList |> String.concat("")
 
