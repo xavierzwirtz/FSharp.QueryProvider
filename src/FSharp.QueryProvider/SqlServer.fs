@@ -436,7 +436,7 @@ module SqlServer =
                     if m.Expression <> null && m.Expression.NodeType = ExpressionType.Parameter then
                         //this needs to call a function to determine column name for extensibility.    
                         match context.TableAlias with
-                        | Some tableAlias -> Some (tableAlias @ ["."; m.Member.Name], [], [])
+                        | Some tableAlias -> Some (tableAlias @ ["."; getColumnName(m.Member)], [], [])
                         | None -> failwith "cannot access member without tablealias being genned"
                     else
                         failwithf "The member '%s' is not supported" m.Member.Name

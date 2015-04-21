@@ -20,10 +20,8 @@ let getExpression (f : unit -> obj) =
         try
             let r = f()
             match r with
-            //| :? System.Linq.IQueryable<_> as q -> Some (q :> System.Linq.IQueryable)
             | :? System.Linq.IQueryable as q -> Some q
             | _ -> None
-            //Some (r :?> System.Linq.IQueryable<_>)
         with 
         | e when(e.Message = "EmptyQueryProvider.Execute not implemented") -> None
 
@@ -43,12 +41,12 @@ let getExpression (f : unit -> obj) =
         else
             provider.Expressions |> Seq.last
 
-let AreEqualExpression get expectedSql (expectedParameters: list<PreparedParameter<_>>) (expectedResultConstructionInfo) : unit =
+let AreEqualTranslateExpression (translate : Expression -> PreparedStatement<_>) get expectedSql (expectedParameters: list<PreparedParameter<_>>) (expectedResultConstructionInfo) : unit =
         
     let expression = getExpression get
 
     printfn "%s" (expression.ToString())
-    let sqlQuery = SqlServer.translate None None None expression
+    let sqlQuery = translate expression
 
     if expectedSql <> sqlQuery.Text then
         printfn "query: %s" sqlQuery.Text
@@ -70,6 +68,7 @@ let AreEqualExpression get expectedSql (expectedParameters: list<PreparedParamet
 
     printfn "%s" (sqlQuery.FormattedText)
 
+let AreEqualExpression = AreEqualTranslateExpression (SqlServer.translate None None None)
 //use for test data:
 //http://fsprojects.github.io/FSharp.Linq.ComposableQuery/QueryExamples.html
 //https://msdn.microsoft.com/en-us/library/vstudio/hh225374.aspx
@@ -129,6 +128,54 @@ module QueryGenTest =
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
             {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
+
+    [<Test>]
+    let ``extend column name``() =
+        
+        let q = fun () -> 
+            query {
+                for p in queryable<Person>() do
+                where(p.PersonName = "john")
+                where(p.JobKind = JobKind.Manager)
+                select p
+            } :> obj
+        
+        let translate = 
+            SqlServer.translate None None (Some (fun m ->
+                if m.Name = "PersonName" then
+                    Some (m.Name + "Mod")
+                else
+                    None
+            ))
+        AreEqualTranslateExpression translate q "SELECT T.PersonId, T.PersonNameMod, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonNameMod = @p1 AND T.JobKind = @p2)" [
+            {Name="p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
+            {Name="p2"; Value=(JobKind.Manager); DbType = System.Data.SqlDbType.Int}
+        ] (personSelect 0)
+
+    [<Test>]
+    let ``extend table name``() =
+        
+        let q = fun () -> 
+            query {
+                for p in queryable<Person>() do
+                where(query {
+                    for e in queryable<Employee>() do
+                    select e.PersonId
+                    contains p.PersonId
+                })
+                select p
+            } :> obj
+        
+        let translate = 
+            SqlServer.translate None (Some (fun t ->
+                if t.Name = "Person" then
+                    Some (t.Name + "Mod")
+                else
+                    None
+            )) None
+
+
+        AreEqualTranslateExpression translate q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM PersonMod AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2))" [] (personSelect 0)
 
     [<Test>]
     let ``where local var``() =
