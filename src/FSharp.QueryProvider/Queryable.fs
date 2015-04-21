@@ -1,5 +1,7 @@
 ﻿module FSharp.QueryProvider.Queryable
 
+open FSharp.QueryProvider
+
 open System.Reflection
 open System.Linq
 open System.Linq.Expressions
@@ -48,7 +50,6 @@ module TypeSystem =
         | None -> seqType
         | Some(ienum) ->  ienum
             //ienum.GetGenericArguments() |> Seq.head
-
 
 type Query<'T>(provider : QueryProvider, expression : Expression option) as this = 
     
@@ -110,5 +111,18 @@ and [<AbstractClass>] QueryProvider() =
         member this.Execute (expression) =
             this.Execute expression
 
-    //abstract member GetQueryText : Expression -> string
     abstract member Execute : Expression -> obj
+
+type DBQueryProvider<'T when 'T :> System.Data.IDbConnection>(connection : 'T, translate : 'T -> Expression -> System.Data.IDbCommand * DataReader.TypeConstructionInfo) =
+    inherit QueryProvider()
+    override this.Execute expression =
+        let cmd, ctorInfo = translate connection expression
+
+//        let cmd = connection.CreateCommand()
+//
+//        let param = cmd.CreateParameter()
+//        param.
+//        cmd.CommandText <- this.Translate(expression)
+
+        use reader = cmd.ExecuteReader()
+        DataReader.constructResult reader ctorInfo

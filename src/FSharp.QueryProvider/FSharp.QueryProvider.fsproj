@@ -46,11 +46,13 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DataReader.fs" />
+    <Compile Include="PreparedQuery.fs" />
     <Compile Include="Queryable.fs" />
     <Compile Include="Library.fs" />
     <Compile Include="ExpressionMatching.fs" />
     <Compile Include="Expression.fs" />
-    <Compile Include="DataReader.fs" />
+    <Compile Include="QueryTranslatorUtilities.fs" />
     <Compile Include="SqlServerQueryTranslator.fs" />
     <None Include="paket.references" />
     <None Include="paket.template" />

@@ -2,6 +2,7 @@
 
 open NUnit.Framework
 open FSharp.QueryProvider
+open FSharp.QueryProvider.PreparedQuery
 open FSharp.QueryProvider.DataReader
 open FSharp.QueryProvider.QueryTranslator
 
