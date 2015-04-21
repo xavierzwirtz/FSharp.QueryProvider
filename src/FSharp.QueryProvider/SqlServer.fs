@@ -1,14 +1,14 @@
-﻿namespace FSharp.QueryProvider.QueryTranslator
+﻿namespace FSharp.QueryProvider.Engines
 
 type IQueryable = System.Linq.IQueryable
 type IQueryable<'T> = System.Linq.IQueryable<'T>
 type SqlDbType = System.Data.SqlDbType
 
 open System.Linq.Expressions
+open FSharp.QueryProvider
 open FSharp.QueryProvider.Expression
 open FSharp.QueryProvider.ExpressionMatching
 open FSharp.QueryProvider.QueryTranslatorUtilities
-open FSharp.QueryProvider
 open FSharp.QueryProvider.DataReader
 open FSharp.QueryProvider.PreparedQuery
 
@@ -31,6 +31,11 @@ module SqlServer =
         | System.TypeCode.Int32 -> DataType SqlDbType.Int
         | System.TypeCode.Int64 -> DataType SqlDbType.BigInt
         | t -> Unhandled
+
+    let defaultGetTableName (t:System.Type) : string =
+        t.Name
+    let defaultGetColumnName (t:System.Reflection.MemberInfo) : string =
+        t.Name
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
     let createTypeConstructionInfo selectIndex (t : System.Type) manyOrOne =
@@ -72,14 +77,14 @@ module SqlServer =
                 failwith "not implemented type '%s'" t.Name
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
-    let createTypeSelect (tableAlias : string list) (topSelect : bool) (t : System.Type) =
+    let createTypeSelect (getColumnName : System.Reflection.MemberInfo -> string) (tableAlias : string list) (topSelect : bool) (t : System.Type) =
         // need to call a function here so that this can be extended
         if Microsoft.FSharp.Reflection.FSharpType.IsRecord t then
             let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields t |> Seq.toList
 
             let query = 
                 fields 
-                |> List.map(fun  f -> tableAlias @ ["."; f.Name]) 
+                |> List.map(fun  f -> tableAlias @ ["."; getColumnName f]) 
                 |> List.interpolate([[", "]])
                 |> List.reduce(@)
 
@@ -95,7 +100,11 @@ module SqlServer =
         else
             failwith "not implemented, only records are currently implemented"
 
-    let translate (getDBType : GetDBType<SqlDbType> option) (expression : Expression) = 
+    let translate 
+        (getDBType : GetDBType<SqlDbType> option) 
+        (getTableName : GetTableName option) 
+        (getColumnName : GetColumnName option) 
+        (expression : Expression) = 
         
         let getDBType = 
             match getDBType with 
@@ -107,6 +116,21 @@ module SqlServer =
                     | r -> r
                 | r -> r
             | None -> defaultGetDBType
+
+        let getColumnName =
+            match getColumnName with
+            | Some g -> fun t ->
+                match g t with 
+                | Some r ->  r
+                | None -> defaultGetColumnName t
+            | None -> defaultGetColumnName
+        let getTableName =
+            match getTableName with
+            | Some g -> fun t ->
+                match g t with 
+                | Some r ->  r
+                | None -> defaultGetTableName t
+            | None -> defaultGetTableName
 
         let columnNameUnique = ref 0
 
@@ -136,7 +160,7 @@ module SqlServer =
                 createNull (getColumnNameIndex()) dbType
 
             let createTypeSelect tableAlias t = 
-                let q, ctorOption = createTypeSelect tableAlias context.TopSelect t
+                let q, ctorOption = createTypeSelect getColumnName tableAlias context.TopSelect t
                 let c = 
                     match ctorOption with
                     | None -> []
@@ -275,8 +299,7 @@ module SqlServer =
                             | None -> []
 
                         let selectStatement =
-                            let table = queryable.ElementType.Name
-                            ["SELECT " ] @ topStatement @ selectColumn @ ["FROM "; table; " AS "; ] @ tableAlias
+                            ["SELECT " ] @ topStatement @ selectColumn @ ["FROM "; getTableName(queryable.ElementType); " AS "; ] @ tableAlias
 
                         let whereClause, whereParameters, whereCtor =
                             let fromWhere = 
@@ -437,3 +460,20 @@ module SqlServer =
             Parameters = queryParameters
             ResultConstructionInfo = resultConstructionInfo |> Seq.exactlyOne
         }
+
+    let createCommand (connection : System.Data.SqlClient.SqlConnection) (preparedStatement : PreparedStatement<SqlDbType>) =
+        
+        let cmd = connection.CreateCommand()
+        cmd.CommandText <- preparedStatement.Text
+        for param in preparedStatement.Parameters do
+            let sqlParam = cmd.CreateParameter()
+            sqlParam.Value <- param.Value
+            sqlParam.SqlDbType <- param.DbType
+        cmd
+
+    let translateToCommand getDBType getTableName getColumnName connection expression =
+        let ps = translate getDBType getTableName getColumnName expression
+
+        let cmd = createCommand connection ps
+
+        cmd, ps.ResultConstructionInfo

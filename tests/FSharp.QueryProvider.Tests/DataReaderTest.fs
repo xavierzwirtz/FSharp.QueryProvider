@@ -2,7 +2,6 @@
 open NUnit.Framework
 open FSharp.QueryProvider
 open FSharp.QueryProvider.DataReader
-open FSharp.QueryProvider.QueryTranslator
 
 open Models
 open LocalDataReader

@@ -4,7 +4,7 @@ open NUnit.Framework
 open FSharp.QueryProvider
 open FSharp.QueryProvider.PreparedQuery
 open FSharp.QueryProvider.DataReader
-open FSharp.QueryProvider.QueryTranslator
+open FSharp.QueryProvider.Engines
 
 open Models
 
@@ -48,7 +48,7 @@ let AreEqualExpression get expectedSql (expectedParameters: list<PreparedParamet
     let expression = getExpression get
 
     printfn "%s" (expression.ToString())
-    let sqlQuery = SqlServer.translate None expression
+    let sqlQuery = SqlServer.translate None None None expression
 
     if expectedSql <> sqlQuery.Text then
         printfn "query: %s" sqlQuery.Text
@@ -455,7 +455,7 @@ module QueryGenTest =
         
         let e = getExpression q
         let exc = Assert.Throws(fun () -> 
-            QueryTranslator.SqlServer.translate None e |> ignore)
+            SqlServer.translate None None None e |> ignore)
         Assert.AreEqual(exc.Message, "'last' operator has no translations for Sql Server")
 
     [<Test>]
@@ -468,7 +468,7 @@ module QueryGenTest =
         
         let e = getExpression q
         let exc = Assert.Throws(fun () -> 
-            QueryTranslator.SqlServer.translate None e |> ignore)
+            SqlServer.translate None None None e |> ignore)
         Assert.AreEqual(exc.Message, "'lastOrDefault' operator has no translations for Sql Server")
 
     [<Test>]

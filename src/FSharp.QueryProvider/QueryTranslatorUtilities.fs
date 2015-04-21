@@ -31,6 +31,8 @@ type TypeSource =
 | Type of System.Type
 
 type GetDBType<'t> = TypeSource -> DBType<'t>
+type GetTableName = System.Type -> string option
+type GetColumnName = System.Reflection.MemberInfo -> string option
 
 let getLambda (m : MethodCallExpression) =
         (stripQuotes (m.Arguments.Item(1))) :?> LambdaExpression
