@@ -2,6 +2,7 @@
 
 type IQueryable = System.Linq.IQueryable
 type IQueryable<'T> = System.Linq.IQueryable<'T>
+type SqlDbType = System.Data.SqlDbType
 
 open System.Linq.Expressions
 open FSharp.QueryProvider.Expression
@@ -13,62 +14,23 @@ open FSharp.QueryProvider.PreparedQuery
 
 module SqlServer =
 
-    type DbTypeOrObject =
-    | Object
-    | SqlDbType of System.Data.SqlDbType
-
-    let typeToDbType (t : System.Type) =
+    let defaultGetDBType (morP : TypeSource) : SqlDbType DBType =
+        let t = 
+            match morP with 
+            | Method m -> m.ReturnType
+            | Property p -> p.PropertyType
+            | Value v -> v.GetType()
+            | Type t -> t
+        let t = unwrapType t
         match System.Type.GetTypeCode(t) with 
-        | System.TypeCode.Boolean -> SqlDbType System.Data.SqlDbType.Bit
-        | System.TypeCode.String -> SqlDbType System.Data.SqlDbType.NVarChar
-        | System.TypeCode.DateTime -> SqlDbType System.Data.SqlDbType.DateTime2
-        | System.TypeCode.Byte -> SqlDbType System.Data.SqlDbType.TinyInt
-        | System.TypeCode.Int16 -> SqlDbType System.Data.SqlDbType.SmallInt
-        | System.TypeCode.Int32 -> SqlDbType System.Data.SqlDbType.Int
-        | System.TypeCode.Int64 -> SqlDbType System.Data.SqlDbType.BigInt
-        | System.TypeCode.Object -> 
-            Object
-        | t -> failwithf "not implemented type '%s'" (t.ToString())
-
-    let createParameter columnIndex value dbType = 
-        let p = {
-            PreparedParameter.Name = "p" + columnIndex.ToString()
-            Value = value
-            DbType = dbType
-        }
-
-        ["@"; p.Name; ""], [p], List.empty<TypeConstructionInfo>
-
-    let rec valueToQueryAndParam (columnIndex : int) (value : obj) = 
-        let t = value.GetType()
-
-        let dbType = typeToDbType(t)
-      
-        match dbType with
-        | Object ->
-            if t |> isOption then 
-                t.GetMethod("get_Value").Invoke(value, [||]) |> valueToQueryAndParam columnIndex
-            else
-                failwithf "The constant for '%A' is not supported" value
-        | SqlDbType dbType ->
-            createParameter columnIndex value dbType
-
-    let createNull (columnIndex : int) (t : DbTypeOrObject) =
-        match t with
-        | Object -> failwith "this value cannot be object type"
-        | SqlDbType dbType ->
-            createParameter columnIndex System.DBNull.Value dbType
-
-//    let createTypeConstructionInfoExplicitFields (fields : System.Reflection.PropertyInfo seq) selectIndex (t : System.Type) =
-//        let ctorArgs = fields |> Seq.mapi(fun i f ->
-//            selectIndex + i
-//        )
-//
-//        {
-//            Type = t
-//            ConstructorArgs = ctorArgs
-//            PropertySets = []
-//        }
+        | System.TypeCode.Boolean -> DataType SqlDbType.Bit
+        | System.TypeCode.String -> DataType SqlDbType.NVarChar
+        | System.TypeCode.DateTime -> DataType SqlDbType.DateTime2
+        | System.TypeCode.Byte -> DataType SqlDbType.TinyInt
+        | System.TypeCode.Int16 -> DataType SqlDbType.SmallInt
+        | System.TypeCode.Int32 -> DataType SqlDbType.Int
+        | System.TypeCode.Int64 -> DataType SqlDbType.BigInt
+        | t -> Unhandled
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
     let createTypeConstructionInfo selectIndex (t : System.Type) manyOrOne =
@@ -133,18 +95,24 @@ module SqlServer =
         else
             failwith "not implemented, only records are currently implemented"
 
-    let translate (expression : Expression) = 
+    let translate (getDBType : GetDBType<SqlDbType> option) (expression : Expression) = 
         
+        let getDBType = 
+            match getDBType with 
+            | Some g -> fun morP -> 
+                match g morP with
+                | Unhandled -> 
+                    match defaultGetDBType morP with
+                    | Unhandled -> failwithf "Could not determine DataType for '%A' is not handled" morP
+                    | r -> r
+                | r -> r
+            | None -> defaultGetDBType
+
         let columnNameUnique = ref 0
 
         let getColumnNameIndex () = 
             columnNameUnique := (!columnNameUnique + 1)
             !columnNameUnique
-
-//        let selectIndex = ref 0
-//
-//        let incrementSelectIndex amount = 
-//            selectIndex := (!selectIndex + amount)
 
         let tableAliasIndex = ref 1
 
@@ -162,10 +130,10 @@ module SqlServer =
             let map = fun e ->
                 mapd context e
 
-            let valueToQueryAndParam value = 
-                valueToQueryAndParam (getColumnNameIndex()) value
-            let createNull value = 
-                createNull (getColumnNameIndex()) value
+            let valueToQueryAndParam dbType value = 
+                valueToQueryAndParam (getColumnNameIndex()) dbType value
+            let createNull dbType = 
+                createNull (getColumnNameIndex()) dbType
 
             let createTypeSelect tableAlias t = 
                 let q, ctorOption = createTypeSelect tableAlias context.TopSelect t
@@ -389,10 +357,14 @@ module SqlServer =
                         let ctor = orderByCtor @ whereCtor @ selectCtor
                         Some (sql, parameters, ctor)
                     | None ->
+                        let simpleInvoke m = 
+                            let v = invoke m
+                            Some (v |> valueToQueryAndParam (getDBType (Value v)))
+
                         match m.Method.Name with
                         | "Contains" | "StartsWith" | "EndsWith" as typeName when(m.Object.Type = typedefof<string>) ->
-                            let arg = m.Arguments.Item(0) 
-                            let valQ, valP, valC = valueToQueryAndParam ((arg :?> ConstantExpression).Value)
+                            let value = (m.Arguments.Item(0)  :?> ConstantExpression).Value
+                            let valQ, valP, valC = valueToQueryAndParam (getDBType (Value value)) value
                             let search =
                                 match typeName with 
                                 | "Contains" -> ["'%' + "] @ valQ @ [" + '%'"]
@@ -403,12 +375,12 @@ module SqlServer =
 
                             Some (colQ @ [" LIKE "] @ search, colP @ valP, colC @ valC)
                         | "Invoke" | "op_Dereference" -> 
-                            Some (invoke m |> valueToQueryAndParam)
+                            simpleInvoke m
                         | "Some" when (isOption m.Method.ReturnType) -> 
-                            Some (invoke m |> valueToQueryAndParam)
+                            simpleInvoke m
                         | "get_None" when (isOption m.Method.ReturnType) -> 
                             let t = m.Method.ReturnType.GetGenericArguments() |> Seq.head
-                            Some (createNull(t |> typeToDbType))
+                            Some (createNull (getDBType (Type t)))
                         | x -> failwithf "Method '%s' is not implemented." x
                 | Not n ->
                     let sql, parameters, ctor = map(n.Operand)
@@ -435,7 +407,7 @@ module SqlServer =
                     else if c.Value = null then
                         Some (["NULL"] ,[], [])
                     else
-                        Some (valueToQueryAndParam c.Value)
+                        Some (valueToQueryAndParam (getDBType (Value c.Value)) c.Value)
                 | MemberAccess m ->
 //                    failwith "should be handled explicitly"
                     if m.Expression <> null && m.Expression.NodeType = ExpressionType.Parameter then
@@ -462,6 +434,6 @@ module SqlServer =
         {
             PreparedStatement.Text = query
             FormattedText = query
-            Parameters = queryParameters //Seq.empty<PreparedParameter<System.Data.SqlDbType>>
+            Parameters = queryParameters
             ResultConstructionInfo = resultConstructionInfo |> Seq.exactlyOne
         }
