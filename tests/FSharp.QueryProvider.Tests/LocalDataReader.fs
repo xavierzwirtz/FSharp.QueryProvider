@@ -112,7 +112,7 @@ type LocalDataReader(data : obj list list) =
         
         member x.Read(): bool = 
             currentIndex <- currentIndex + 1
-            if currentIndex > (data |> List.length) then
+            if currentIndex >= (data |> List.length) then
                 false
             else
                 true

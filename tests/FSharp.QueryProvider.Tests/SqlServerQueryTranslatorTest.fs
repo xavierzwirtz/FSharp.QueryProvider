@@ -54,17 +54,7 @@ let AreEqualExpression get expectedSql (expectedParameters: list<PreparedParamet
 
     Assert.AreEqual(expectedSql, sqlQuery.Text)
 
-    let compareSeq a b = 
-        if Seq.length a = Seq.length b then
-            Seq.fold (&&) true (Seq.zip a b |> Seq.map (fun (aa,bb) -> aa=bb))
-        else
-            false
-
-    let areEqualSeq e a =
-        if not (compareSeq e a) then
-            Assert.Fail(sprintf "Expected: %A \nActual: %A" (e |> Seq.toList) (a |> Seq.toList))
-
-    areEqualSeq sqlQuery.Parameters (expectedParameters |> List.toSeq)
+    areSeqEqual sqlQuery.Parameters (expectedParameters |> List.toSeq)
 
     let ctorEqual =
         let e = expectedResultConstructionInfo
@@ -152,7 +142,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
             {Name="p1"; Value=(!name); DbType = System.Data.SqlDbType.NVarChar}
-        ] (employeeSelect 0)
+        ] (personSelect 0)
 
     [<Test>]
     let ``where local function applied``() =

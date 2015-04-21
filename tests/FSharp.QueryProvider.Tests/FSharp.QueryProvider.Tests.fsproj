@@ -58,6 +58,7 @@
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <ItemGroup>
     <None Include="paket.references" />
+    <Compile Include="AssertExtensions.fs" />
     <Compile Include="Models.fs" />
     <Compile Include="EmptyQueryProvider.fs" />
     <Compile Include="LocalDataReader.fs" />
