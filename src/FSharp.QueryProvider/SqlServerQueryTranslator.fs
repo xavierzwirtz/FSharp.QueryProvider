@@ -1,6 +1,7 @@
 ﻿namespace FSharp.QueryProvider.QueryTranslator
 
 open FSharp.QueryProvider
+open FSharp.QueryProvider.DataReader
 
 type PreparedParameter<'T> = {
     Name : string
@@ -8,17 +9,11 @@ type PreparedParameter<'T> = {
     DbType : 'T
 }
 
-type ConstructionInfo = {
-    Type : System.Type
-    ConstructorArgs : int seq
-    PropertySets : (int * System.Reflection.PropertyInfo) seq
-}
-
 type PreparedStatement<'P> = {
     Text : string
     FormattedText : string
     Parameters : PreparedParameter<'P> seq
-    ConstructionInfo : ConstructionInfo seq
+    ResultConstructionInfo : TypeConstructionInfo
 }
 
 type IQueryable = System.Linq.IQueryable
@@ -113,7 +108,7 @@ module SqlServer =
             DbType = dbType
         }
 
-        ["@"; p.Name; ""], [p], List.empty<ConstructionInfo>
+        ["@"; p.Name; ""], [p], List.empty<TypeConstructionInfo>
 
     let rec valueToQueryAndParam (columnIndex : int) (value : obj) = 
         let t = value.GetType()
@@ -135,8 +130,7 @@ module SqlServer =
         | SqlDbType dbType ->
             createParameter columnIndex System.DBNull.Value dbType
 
-
-//    let createConstructionInfoExplicitFields (fields : System.Reflection.PropertyInfo seq) selectIndex (t : System.Type) =
+//    let createTypeConstructionInfoExplicitFields (fields : System.Reflection.PropertyInfo seq) selectIndex (t : System.Type) =
 //        let ctorArgs = fields |> Seq.mapi(fun i f ->
 //            selectIndex + i
 //        )
@@ -148,7 +142,7 @@ module SqlServer =
 //        }
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
-    let createConstructionInfo selectIndex (t : System.Type) =
+    let createTypeConstructionInfo selectIndex (t : System.Type) manyOrOne =
         if Microsoft.FSharp.Reflection.FSharpType.IsRecord t then
             let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields t |> Seq.toList
 
@@ -157,18 +151,20 @@ module SqlServer =
             )
 
             {
+                ManyOrOne = manyOrOne
                 Type = t
                 ConstructorArgs = ctorArgs
                 PropertySets = []
-            }, Seq.length(fields) 
+            }
         else
             let x = typedefof<int>
             let simple () = 
                 {
+                    ManyOrOne = manyOrOne
                     Type = t
                     ConstructorArgs = [selectIndex] 
                     PropertySets = []
-                }, 1
+                }
             let simpleTypes = [
                 typedefof<int16>
                 typedefof<int>
@@ -183,8 +179,8 @@ module SqlServer =
                 simple()
             else
                 failwith "not implemented type '%s'" t.Name
-
-    let createTypeSelect (tableAlias : string list) (selectIndex : int) (topSelect : bool) (t : System.Type) =
+    //terible duplication of code between this and createTypeSelect. needs to be refactored.
+    let createTypeSelect (tableAlias : string list) (topSelect : bool) (t : System.Type) =
         // need to call a function here so that this can be extended
         if Microsoft.FSharp.Reflection.FSharpType.IsRecord t then
             let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields t |> Seq.toList
@@ -199,11 +195,11 @@ module SqlServer =
 
             let ctor = 
                 if topSelect then
-                    Some (fst(createConstructionInfo selectIndex t))
+                    Some (createTypeConstructionInfo 0 t Many)
                 else
                     None
 
-            query, ctor, Seq.length(fields)
+            query, ctor
         else
             failwith "not implemented, only records are currently implemented"
 
@@ -215,10 +211,10 @@ module SqlServer =
             columnNameUnique := (!columnNameUnique + 1)
             !columnNameUnique
 
-        let selectIndex = ref 0
-
-        let incrementSelectIndex amount = 
-            selectIndex := (!selectIndex + amount)
+//        let selectIndex = ref 0
+//
+//        let incrementSelectIndex amount = 
+//            selectIndex := (!selectIndex + amount)
 
         let tableAliasIndex = ref 1
 
@@ -230,7 +226,7 @@ module SqlServer =
             tableAliasIndex := (!tableAliasIndex + 1)
             a
         
-        let rec mapFun (context : Context) e : ExpressionResult * (string list * PreparedParameter<_> list * ConstructionInfo list) = 
+        let rec mapFun (context : Context) e : ExpressionResult * (string list * PreparedParameter<_> list * TypeConstructionInfo list) = 
             let mapd = fun context e ->
                 mapd(mapFun) context e |> splitResults
             let map = fun e ->
@@ -240,19 +236,14 @@ module SqlServer =
                 valueToQueryAndParam (getColumnNameIndex()) value
             let createNull value = 
                 createNull (getColumnNameIndex()) value
+
             let createTypeSelect tableAlias t = 
-                let q, ctorOption, columnIndex = createTypeSelect tableAlias (!selectIndex) context.TopSelect t
-                incrementSelectIndex columnIndex
+                let q, ctorOption = createTypeSelect tableAlias context.TopSelect t
                 let c = 
                     match ctorOption with
                     | None -> []
                     | Some c -> [c]
                 q, [], c
-
-            let createConstructionInfo t = 
-                let ctor, i = createConstructionInfo !selectIndex t
-                incrementSelectIndex i
-                ctor
 
             let bin (e : BinaryExpression) (text : string) = 
                 let leftSql, leftParams, leftCtor = map(e.Left)
@@ -287,7 +278,7 @@ module SqlServer =
                 | Some result -> 
                     Some(fst(result).Value, snd(result))
 
-            let result : option<string list * PreparedParameter<_> list * ConstructionInfo list>= 
+            let result : option<string list * PreparedParameter<_> list * TypeConstructionInfo list>= 
                 match e with
                 | Call m -> 
                     let linqChain = getOperationsAndQueryable m
@@ -340,17 +331,17 @@ module SqlServer =
                         let selectColumn, selectParameters, selectCtor = 
                             match count with
                             | Some c-> 
-                                ["COUNT(*) "], [], [createConstructionInfo typedefof<int>]
+                                ["COUNT(*) "], [], [createTypeConstructionInfo 0 typedefof<int> One]
                             | None -> 
                                 match contains with 
                                 | Some c -> 
-                                    ["CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END "], [] , [createConstructionInfo typedefof<bool>]
+                                    ["CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END "], [] , [createTypeConstructionInfo 0 typedefof<bool> One]
                                 | None -> 
                                     let partialSelect (l : LambdaExpression) =
                                         let t = l.ReturnType
                                         let c = 
                                             if context.TopSelect then
-                                                [createConstructionInfo t]
+                                                [createTypeConstructionInfo 0 t Many]
                                             else
                                                 []
                                         let q, p, _ = (getLambda(m).Body |> map) 
@@ -367,10 +358,6 @@ module SqlServer =
                                             | l ->
                                                 partialSelect l
                                         | None -> 
-//                                            match wheres with 
-//                                            | [] -> failwith "cannot determine type" //star
-//                                            | _ -> 
-//                                                let f = wheres |> Seq.head
                                             createTypeSelect (Queryable.TypeSystem.getElementType (queryable.GetType()))
                         let topStatement = 
                             let count = 
@@ -533,16 +520,12 @@ module SqlServer =
             match result with
             | Some r -> ExpressionResult.Skip, r
             | None -> ExpressionResult.Recurse, ([], [], [])
-//            if result.IsSome then 
-//                ExpressionResult.Skip, result
-//            else
-//                ExpressionResult.Recurse, result
 
         let results = 
             expression
             |> mapd(mapFun) ({TableAlias = None; TopSelect = true})
 
-        let queryList, queryParameters, constructionInfo =  results |> splitResults
+        let queryList, queryParameters, resultConstructionInfo = results |> splitResults
 
         let query = queryList |> String.concat("")
 
@@ -550,5 +533,5 @@ module SqlServer =
             PreparedStatement.Text = query
             FormattedText = query
             Parameters = queryParameters //Seq.empty<PreparedParameter<System.Data.SqlDbType>>
-            ConstructionInfo = constructionInfo
+            ResultConstructionInfo = resultConstructionInfo |> Seq.exactlyOne
         }

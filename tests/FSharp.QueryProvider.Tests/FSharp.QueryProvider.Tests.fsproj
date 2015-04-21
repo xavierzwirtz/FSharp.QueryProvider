@@ -60,8 +60,10 @@
     <None Include="paket.references" />
     <Compile Include="Models.fs" />
     <Compile Include="EmptyQueryProvider.fs" />
+    <Compile Include="LocalDataReader.fs" />
     <Compile Include="ExpressionTest.fs" />
     <Compile Include="SqlServerQueryTranslatorTest.fs" />
+    <Compile Include="DataReaderTest.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

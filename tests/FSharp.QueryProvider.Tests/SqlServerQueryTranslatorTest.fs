@@ -2,6 +2,7 @@
 
 open NUnit.Framework
 open FSharp.QueryProvider
+open FSharp.QueryProvider.DataReader
 open FSharp.QueryProvider.QueryTranslator
 
 open Models
@@ -41,7 +42,7 @@ let getExpression (f : unit -> obj) =
         else
             provider.Expressions |> Seq.last
 
-let AreEqualExpression get expectedSql (expectedParameters: list<PreparedParameter<_>>) (expectedConstructionInfo) : unit =
+let AreEqualExpression get expectedSql (expectedParameters: list<PreparedParameter<_>>) (expectedResultConstructionInfo) : unit =
         
     let expression = getExpression get
 
@@ -53,35 +54,28 @@ let AreEqualExpression get expectedSql (expectedParameters: list<PreparedParamet
 
     Assert.AreEqual(expectedSql, sqlQuery.Text)
 
-    let test a b = 
+    let compareSeq a b = 
         if Seq.length a = Seq.length b then
             Seq.fold (&&) true (Seq.zip a b |> Seq.map (fun (aa,bb) -> aa=bb))
         else
             false
 
-    if not (test sqlQuery.Parameters (expectedParameters |> List.toSeq)) then
-        Assert.Fail(sprintf "Expected: %A \nActual: %A" (expectedParameters |> Seq.toList) (sqlQuery.Parameters |> Seq.toList))
+    let areEqualSeq e a =
+        if not (compareSeq e a) then
+            Assert.Fail(sprintf "Expected: %A \nActual: %A" (e |> Seq.toList) (a |> Seq.toList))
+
+    areEqualSeq sqlQuery.Parameters (expectedParameters |> List.toSeq)
 
     let ctorEqual =
-        let e = expectedConstructionInfo |> List.toSeq
-        let a = sqlQuery.ConstructionInfo
-        if Seq.length a <> Seq.length e then
-            false
-        else
-            Seq.fold (&&) true (Seq.zip e a |> Seq.map (fun (aa,ee) -> 
-                if ee.Type <> aa.Type then
-                    false
-                else if not (test ee.ConstructorArgs aa.ConstructorArgs) then
-                    false
-                else if not (test ee.PropertySets aa.PropertySets) then
-                    false
-                else
-                    true
-             ))
-        
-
+        let e = expectedResultConstructionInfo
+        let a = sqlQuery.ResultConstructionInfo
+        e.ManyOrOne = a.ManyOrOne &&
+        e.Type = a.Type &&
+        compareSeq e.PropertySets a.PropertySets &&
+        compareSeq e.ConstructorArgs a.ConstructorArgs
+         
     if not ctorEqual then
-        Assert.Fail(sprintf "Expected: %A \nActual: %A" (expectedConstructionInfo |> Seq.toList) (sqlQuery.ConstructionInfo |> Seq.toList))
+        Assert.Fail(sprintf "Expected: \n%A \n\nActual: \n%A" (expectedResultConstructionInfo) (sqlQuery.ResultConstructionInfo))
 
     printfn "%s" (sqlQuery.FormattedText)
 
@@ -90,30 +84,34 @@ let AreEqualExpression get expectedSql (expectedParameters: list<PreparedParamet
 //https://msdn.microsoft.com/en-us/library/vstudio/hh225374.aspx
 module QueryGenTest = 
 
-    let personSelect i = [
-        {
-            Type = typedefof<Person>
-            ConstructorArgs = [i+0;i+1;i+2;i+3] 
-            PropertySets = [] 
-        }
-    ]
-
-    let employeeSelect i = [
-        {
-            Type = typedefof<Employee>
-            ConstructorArgs = [i+0;i+1;i+2;i+3;i+4] 
-            PropertySets = [] 
-        }
-    ]
-    let simpleSelect t i = 
-        [
-            {
-                Type = t
-                ConstructorArgs = [i] 
-                PropertySets = [] 
-            }
-        ]
+    let personSelect i = {
+        ManyOrOne = Many
+        Type = typedefof<Person>
+        ConstructorArgs = [i+0;i+1;i+2;i+3] 
+        PropertySets = [] 
+    }
     
+    let employeeSelect i = {
+        ManyOrOne = Many
+        Type = typedefof<Employee>
+        ConstructorArgs = [i+0;i+1;i+2;i+3;i+4] 
+        PropertySets = [] 
+    }
+
+    let simpleSelect t i = {
+        ManyOrOne = Many
+        Type = t
+        ConstructorArgs = [i] 
+        PropertySets = [] 
+    }
+
+    let simpleOneSelect t i = {
+        ManyOrOne = One
+        Type = t
+        ConstructorArgs = [i] 
+        PropertySets = [] 
+    }
+
     let stringSelect = simpleSelect typedefof<string>
     let intSelect = simpleSelect typedefof<int>
     let boolSelect = simpleSelect typedefof<bool>
@@ -154,7 +152,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
             {Name="p1"; Value=(!name); DbType = System.Data.SqlDbType.NVarChar}
-        ] (personSelect 0)
+        ] (employeeSelect 0)
 
     [<Test>]
     let ``where local function applied``() =
@@ -359,28 +357,30 @@ module QueryGenTest =
         ] (stringSelect(0))
 
     [<Test>]
-    [<Ignore>]
+    [<Ignore("Bug in fsharp compiler")>]
     let ``partial tuple select``() =
+        ignore()
         //This is broken in the fsharp compiler.
         //https://github.com/Microsoft/visualfsharp/issues/47
 
-        let q = fun () -> 
-            query {
-                for p in queryable<Person>() do
-                select (p.PersonName, p.PersonId)
-            } :> obj
-        
-        AreEqualExpression q "SELECT T.PersonName, T.PersonId FROM Person AS T" [] []
+//        let q = fun () -> 
+//            query {
+//                for p in queryable<Person>() do
+//                select (p.PersonName, p.PersonId)
+//            } :> obj
+//        
+//        AreEqualExpression q "SELECT T.PersonName, T.PersonId FROM Person AS T" [] 
 
     [<Test>]
     let ``count``() =
+        
         let q = fun () -> 
             query {
                 for p in queryable<Person>() do
                 count
             } :> obj
 
-        AreEqualExpression q "SELECT COUNT(*) FROM Person AS T" [] (intSelect(0))
+        AreEqualExpression q "SELECT COUNT(*) FROM Person AS T" [] (simpleOneSelect typedefof<int> 0)
 
     [<Test>]
     let ``count where``() =
@@ -393,7 +393,7 @@ module QueryGenTest =
 
         AreEqualExpression q "SELECT COUNT(*) FROM Person AS T WHERE (T.PersonName = @p1)"  [
             {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-        ] (intSelect(0))
+        ] (simpleOneSelect typedefof<int> 0)
 
 
     [<Test>]
@@ -407,7 +407,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM Person AS T WHERE (T.PersonId = @p1)"  [
             {Name="p1"; Value=11; DbType = System.Data.SqlDbType.Int}
-        ] (boolSelect(0))
+        ] (simpleOneSelect typedefof<bool> 0)
 
     [<Test>]
     [<Ignore("Not implemented")>]
@@ -437,7 +437,7 @@ module QueryGenTest =
             {Name="p2"; Value=0; DbType = System.Data.SqlDbType.Int}
             {Name="p3"; Value=5; DbType = System.Data.SqlDbType.Int}
             {Name="p4"; Value=10; DbType = System.Data.SqlDbType.Int}
-        ] (boolSelect(0))
+        ] (simpleOneSelect typedefof<bool> 0)
 
     [<Test>]
     let ``contains where``() =
@@ -452,7 +452,7 @@ module QueryGenTest =
         AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM Person AS T WHERE (T.PersonName = @p1 AND T.PersonId = @p2)" [
             {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
             {Name="p2"; Value=11; DbType = System.Data.SqlDbType.Int}
-        ] (boolSelect(0))
+        ] (simpleOneSelect typedefof<bool> 0)
 
     [<Test>]
     let ``last throws``() =
@@ -621,43 +621,45 @@ module QueryGenTest =
     [<Test>]
     [<Ignore("Not implemented")>]
     let ``groupBy select count``() =
-
-        let q = fun () -> 
-            query {
-                for p in queryable<Person>() do
-                groupBy p.JobKind into g
-                select (g, query { for x in g do count })
-            } :> obj
-
-        AreEqualExpression q "SELECT T.PersonId, COUNT(*) FROM Person AS T GROUP BY T.PersonId" [] []
+        ignore()
+//        let q = fun () -> 
+//            query {
+//                for p in queryable<Person>() do
+//                groupBy p.JobKind into g
+//                select (g, query { for x in g do count })
+//            } :> obj
+//
+//        AreEqualExpression q "SELECT T.PersonId, COUNT(*) FROM Person AS T GROUP BY T.PersonId" [] []
 
     [<Test>]
     [<Ignore("Not implemented")>]
     let ``groupBy select``() =
-        let q = fun () -> 
-            query {
-                for p in queryable<Person>() do
-                groupBy p.JobKind into g
-                select g
-            } :> obj
-            
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] []
+        ignore()
+//        let q = fun () -> 
+//            query {
+//                for p in queryable<Person>() do
+//                groupBy p.JobKind into g
+//                select g
+//            } :> obj
+//            
+//        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] []
         //the group by must be done clientside
 
     [<Test>]
     [<Ignore("Not implemented")>]
     let ``groupBy where select``() =
-        let q = fun () -> 
-            query {
-                for p in queryable<Person>() do
-                where(p.PersonName = "john")
-                groupBy p.JobKind into g
-                select g
-            } :> obj
-            
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-        ] []
+        ignore()
+//        let q = fun () -> 
+//            query {
+//                for p in queryable<Person>() do
+//                where(p.PersonName = "john")
+//                groupBy p.JobKind into g
+//                select g
+//            } :> obj
+//            
+//        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+//            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+//        ] []
         //the group by must be done clientside
 
     [<Test>]
