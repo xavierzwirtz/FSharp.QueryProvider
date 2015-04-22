@@ -74,33 +74,35 @@ let AreEqualExpression get = AreEqualTranslateExpression (SqlServer.translate No
 //https://msdn.microsoft.com/en-us/library/vstudio/hh225374.aspx
 module QueryGenTest = 
 
-    let personSelectType returnType i = {
-        ReturnType = returnType
-        Type = typedefof<Person>
-        ConstructorArgs = [i+0;i+1;i+2;i+3] 
-        PropertySets = [] 
-    }
+    let personSelectType returnType i = 
+        createTypeConstructionInfo typedefof<Person> returnType ([0..3] |> Seq.map(fun v -> Value (i + v))) []
 
     let personSelect = personSelectType Many
     
-    let employeeSelect i = {
-        ReturnType = Many
-        Type = typedefof<Employee>
-        ConstructorArgs = [i+0;i+1;i+2;i+3;i+4] 
-        PropertySets = [] 
-    }
+    let employeeSelect i = 
+        let createSome t i =
+            Type (createTypeConstructionInfo t Single ([Value i]) [])
+         
+        let ctorArgs = [
+            createSome (Some(1).GetType()) 0 
+            createSome (Some("").GetType()) 1
+            createSome (Some(1).GetType()) 2
+            createSome (Some(1).GetType()) 3
+            Value 4
+        ]
+        createTypeConstructionInfo typedefof<Employee> Many ctorArgs []
 
     let simpleSelect t i = {
         ReturnType = Many
         Type = t
-        ConstructorArgs = [i] 
+        ConstructorArgs = [Value i] 
         PropertySets = [] 
     }
 
     let simpleOneSelect t i = {
         ReturnType = Single
         Type = t
-        ConstructorArgs = [i] 
+        ConstructorArgs = [Value i] 
         PropertySets = [] 
     }
 

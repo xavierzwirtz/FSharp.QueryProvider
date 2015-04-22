@@ -19,8 +19,8 @@ module SqlServer =
             match morP with 
             | Method m -> m.ReturnType
             | Property p -> p.PropertyType
-            | Value v -> v.GetType()
-            | Type t -> t
+            | TypeSource.Value v -> v.GetType()
+            | TypeSource.Type t -> t
         let t = unwrapType t
         match System.Type.GetTypeCode(t) with 
         | System.TypeCode.Boolean -> DataType SqlDbType.Bit
@@ -39,41 +39,61 @@ module SqlServer =
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
     let createTypeConstructionInfo selectIndex (t : System.Type) returnType =
-        if Microsoft.FSharp.Reflection.FSharpType.IsRecord t then
-            let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields t |> Seq.toList
-
-            let ctorArgs = fields |> Seq.mapi(fun i f ->
-                selectIndex + i
-            )
-
+        if isValueType t then
             {
                 ReturnType = returnType
                 Type = t
-                ConstructorArgs = ctorArgs
+                ConstructorArgs = [Value selectIndex] 
                 PropertySets = []
             }
         else
-            let x = typedefof<int>
-            let simple () = 
+            if Microsoft.FSharp.Reflection.FSharpType.IsRecord t then
+                let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields t |> Seq.toList
+
+                let ctorArgs = fields |> Seq.mapi(fun i f ->
+                    let selectIndex = (selectIndex + i)
+                    let t = f.PropertyType
+                    if isValueType t then
+                        Value selectIndex
+                    else if isOption t then
+                        Type {
+                            ReturnType = Single
+                            Type = t
+                            ConstructorArgs = [Value selectIndex] 
+                            PropertySets = []
+                        }            
+                    else
+                        failwith "non value type not supported"
+                )
+
                 {
                     ReturnType = returnType
                     Type = t
-                    ConstructorArgs = [selectIndex] 
+                    ConstructorArgs = ctorArgs
                     PropertySets = []
                 }
-            let simpleTypes = [
-                typedefof<int16>
-                typedefof<int>
-                typedefof<int64>
-                typedefof<float>
-                typedefof<decimal>
-                typedefof<string>
-                typedefof<System.DateTime>
-                typedefof<bool>
-            ]
-            if simpleTypes |> List.exists ((=) t) then
-                simple()
             else
+//                let x = typedefof<int>
+//                let simple () = 
+//                    {
+//                        ReturnType = returnType
+//                        Type = t
+//                        ConstructorArgs = [selectIndex] 
+//                        PropertySets = []
+//                    }
+//                let simpleTypes = [
+//                    typedefof<int16>
+//                    typedefof<int>
+//                    typedefof<int64>
+//                    typedefof<float>
+//                    typedefof<decimal>
+//                    typedefof<string>
+//                    typedefof<System.DateTime>
+//                    typedefof<bool>
+//                ]
+//                if simpleTypes |> List.exists ((=) t) then
+                //    simple()
+                //else
                 failwith "not implemented type '%s'" t.Name
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
@@ -395,12 +415,12 @@ module SqlServer =
                     | None ->
                         let simpleInvoke m = 
                             let v = invoke m
-                            Some (v |> valueToQueryAndParam (getDBType (Value v)))
+                            Some (v |> valueToQueryAndParam (getDBType (TypeSource.Value v)))
 
                         match m.Method.Name with
                         | "Contains" | "StartsWith" | "EndsWith" as typeName when(m.Object.Type = typedefof<string>) ->
                             let value = (m.Arguments.Item(0)  :?> ConstantExpression).Value
-                            let valQ, valP, valC = valueToQueryAndParam (getDBType (Value value)) value
+                            let valQ, valP, valC = valueToQueryAndParam (getDBType (TypeSource.Value value)) value
                             let search =
                                 match typeName with 
                                 | "Contains" -> ["'%' + "] @ valQ @ [" + '%'"]
@@ -416,7 +436,7 @@ module SqlServer =
                             simpleInvoke m
                         | "get_None" when (isOption m.Method.ReturnType) -> 
                             let t = m.Method.ReturnType.GetGenericArguments() |> Seq.head
-                            Some (createNull (getDBType (Type t)))
+                            Some (createNull (getDBType (TypeSource.Type t)))
                         | x -> failwithf "Method '%s' is not implemented." x
                 | Not n ->
                     let sql, parameters, ctor = map(n.Operand)
@@ -443,7 +463,7 @@ module SqlServer =
                     else if c.Value = null then
                         Some (["NULL"] ,[], [])
                     else
-                        Some (valueToQueryAndParam (getDBType (Value c.Value)) c.Value)
+                        Some (valueToQueryAndParam (getDBType (TypeSource.Value c.Value)) c.Value)
                 | MemberAccess m ->
 //                    failwith "should be handled explicitly"
                     if m.Expression <> null && m.Expression.NodeType = ExpressionType.Parameter then

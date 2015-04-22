@@ -75,10 +75,6 @@ let splitResults source =
         third(a) @ third(b)
     ) (List.empty, List.empty, List.empty)
 
-let isOption (t : System.Type) = 
-    t.IsGenericType &&
-    t.GetGenericTypeDefinition() = typedefof<Option<_>>
-
 let unionExactlyOneCaseOneField t = 
     let cases = FSharpType.GetUnionCases t
     if cases |> Seq.length > 1 then

@@ -9,16 +9,38 @@ type ReturnType =
 | Many
 // | Group of GroupExpression
 
-type TypeConstructionInfo = {
+type ValueOrTypeConstructionInfo = 
+| Type of TypeConstructionInfo
+| Value of int
+
+and TypeConstructionInfo = {
     Type : System.Type
     ReturnType : ReturnType
-    ConstructorArgs : int seq
-    PropertySets : (int * System.Reflection.PropertyInfo) seq
+    ConstructorArgs : ValueOrTypeConstructionInfo seq
+    PropertySets : (ValueOrTypeConstructionInfo * System.Reflection.PropertyInfo) seq
 }
 
-let constructResult (reader : System.Data.IDataReader) (typeCtor : TypeConstructionInfo) : obj =
+let createTypeConstructionInfo t returnType constructorArgs propertySets =
+    {
+        Type = t
+        ReturnType = returnType
+        ConstructorArgs = constructorArgs
+        PropertySets = propertySets
+    }
+
+let isValueType (t : System.Type) =
+    t.IsValueType || t = typedefof<string>
+let isOption (t : System.Type) = 
+    t.IsGenericType &&
+    t.GetGenericTypeDefinition() = typedefof<Option<_>>
+
+let rec constructResult (reader : System.Data.IDataReader) (typeCtor : TypeConstructionInfo) : obj =
     
-    let getSingleIndex() = typeCtor.ConstructorArgs |> Seq.exactlyOne
+    let getSingleIndex() = 
+        match typeCtor.ConstructorArgs |> Seq.exactlyOne with
+        | Type _ -> failwith "Shouldnt be Type"
+        | Value i -> i
+
     let t = typeCtor.Type
     if t = typedefof<string> then
         reader.GetString (getSingleIndex()) :> obj
@@ -45,11 +67,19 @@ let constructResult (reader : System.Data.IDataReader) (typeCtor : TypeConstruct
         reader.GetInt32 (getSingleIndex()) :> obj
     else if t = typedefof<int64> then
         reader.GetInt64 (getSingleIndex()) :> obj
+    else if isOption t then
+        let value = reader.GetValue (getSingleIndex())
+        if value <> null then
+            t.GetMethod("Some").Invoke(null, [| value |])
+        else
+            None :> obj
     else
         let ctorArgs = 
             typeCtor.ConstructorArgs
-            |> Seq.map(fun sqlIndex -> 
-                reader.GetValue sqlIndex
+            |> Seq.map(fun arg -> 
+                match arg with 
+                | Type t -> constructResult reader t
+                | Value i -> reader.GetValue i
             )
 
         let inst = 
@@ -87,7 +117,7 @@ let read (reader : System.Data.IDataReader) (typeCtor : TypeConstructionInfo) : 
             match typeCtor.ReturnType with
             | Single -> raise (System.InvalidOperationException "Sequence contains no elements")
             | SingleOrDefault -> 
-                if typeCtor.Type.IsValueType then
+                if isValueType typeCtor.Type then
                     System.Activator.CreateInstance(typeCtor.Type)
                 else
                     null

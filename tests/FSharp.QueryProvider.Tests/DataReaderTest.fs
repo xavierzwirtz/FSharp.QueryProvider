@@ -33,7 +33,7 @@ let ctorOneSimple t =
     {
         ReturnType = Single
         Type = t
-        ConstructorArgs = [0;]
+        ConstructorArgs = [Value 0]
         PropertySets = []
     }
 
@@ -41,7 +41,7 @@ let ctorManySimple t =
     {
         ReturnType = Many
         Type = t
-        ConstructorArgs = [0]
+        ConstructorArgs = [Value 0]
         PropertySets = []
     }
 
@@ -49,23 +49,20 @@ let ctorName returnType =
     {
         ReturnType = returnType
         Type = typedefof<Name>
-        ConstructorArgs = [0;]
+        ConstructorArgs = [Value 0]
         PropertySets = []
     }
 
 let ctorOptionName returnType =
-    {
-        ReturnType = returnType
-        Type = typedefof<OptionName>
-        ConstructorArgs = [0;]
-        PropertySets = []
-    }
+    createTypeConstructionInfo typedefof<OptionName> returnType [
+        Type (createTypeConstructionInfo (Some("").GetType()) returnType [Value 0] [])
+    ] []
 
 let ctorVerboseRecord returnType = 
     {
         ReturnType = returnType
         Type = typedefof<VerboseRecord>
-        ConstructorArgs = [0..11]
+        ConstructorArgs = [0..11] |> Seq.map(fun i -> Value i)
         PropertySets = []
     }
     
@@ -319,7 +316,7 @@ let ``singleOrDefault record no values defaults``() =
     Assert.AreEqual(null, result)
 
 [<Test>]
-let ``tuple value``() =
+let ``option some``() =
 
     let reader = 
         new LocalDataReader([["first"]])
@@ -327,3 +324,13 @@ let ``tuple value``() =
     let result = (read reader (ctorOptionName Single)) :?> OptionName
 
     Assert.AreEqual({OptionValue = Some "first"}, result)
+
+[<Test>]
+let ``option none``() =
+
+    let reader = 
+        new LocalDataReader([[null]])
+
+    let result = (read reader (ctorOptionName Single)) :?> OptionName
+
+    Assert.AreEqual({OptionValue = None}, result)
