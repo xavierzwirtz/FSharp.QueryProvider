@@ -63,7 +63,7 @@
     <Compile Include="EmptyQueryProvider.fs" />
     <Compile Include="LocalDataReader.fs" />
     <Compile Include="ExpressionTest.fs" />
-    <Compile Include="SqlServerQueryTranslatorTest.fs" />
+    <Compile Include="SqlServerTest.fs" />
     <Compile Include="DataReaderTest.fs" />
   </ItemGroup>
   <ItemGroup>
