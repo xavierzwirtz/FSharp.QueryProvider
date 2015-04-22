@@ -45,10 +45,10 @@ let AreEqualTranslateExpression (translate : Expression -> PreparedStatement<_>)
         
     let expression = getExpression get
 
-    printfn "%s" (expression.ToString())
     let sqlQuery = translate expression
 
     if expectedSql <> sqlQuery.Text then
+        printfn "expression: %s" (expression.ToString())
         printfn "query: %s" sqlQuery.Text
 
     Assert.AreEqual(expectedSql, sqlQuery.Text)
@@ -126,7 +126,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
     [<Test>]
@@ -148,8 +148,8 @@ module QueryGenTest =
                     None
             ))
         AreEqualTranslateExpression translate q "SELECT T.PersonId, T.PersonNameMod, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonNameMod = @p1 AND T.JobKind = @p2)" [
-            {Name="p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
-            {Name="p2"; Value=(JobKind.Manager); DbType = System.Data.SqlDbType.Int}
+            {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p2"; Value=(JobKind.Manager); DbType = System.Data.SqlDbType.Int}
         ] (personSelect 0)
 
     [<Test>]
@@ -189,7 +189,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
-            {Name="p1"; Value=(!name); DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value=(!name); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
     [<Test>]
@@ -204,7 +204,7 @@ module QueryGenTest =
                 } :> obj
         
             AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
-                {Name="p1"; Value=gen(); DbType = System.Data.SqlDbType.NVarChar}
+                {Name="@p1"; Value=gen(); DbType = System.Data.SqlDbType.NVarChar}
             ] (personSelect(0))
 
         f (fun () -> "john")
@@ -221,8 +221,8 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1 AND T.PersonId = @p2)" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-            {Name="p2"; Value=5; DbType = System.Data.SqlDbType.Int}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p2"; Value=5; DbType = System.Data.SqlDbType.Int}
         ] (personSelect 0)
 
     [<Test>]
@@ -235,8 +235,8 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1 OR T.PersonName = @p2)" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-            {Name="p2"; Value="doe"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p2"; Value="doe"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
     [<Test>]
@@ -249,9 +249,9 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1 OR T.PersonName = @p2 OR T.PersonName = @p3)" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-            {Name="p2"; Value="doe"; DbType = System.Data.SqlDbType.NVarChar}
-            {Name="p3"; Value="james"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p2"; Value="doe"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p3"; Value="james"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
     [<Test>]
@@ -264,7 +264,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT T.EmployeeId, T.EmployeeName, T.DepartmentId, T.VersionNo, T.PersonId FROM Employee AS T WHERE (T.DepartmentId = @p1)" [
-            {Name="p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
+            {Name="@p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
         ] (employeeSelect 0)
     [<Test>]
     let ``where option none``() =
@@ -276,7 +276,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT T.EmployeeId, T.EmployeeName, T.DepartmentId, T.VersionNo, T.PersonId FROM Employee AS T WHERE (T.DepartmentId = @p1)" [
-            {Name="p1"; Value=System.DBNull.Value; DbType = System.Data.SqlDbType.Int}
+            {Name="@p1"; Value=System.DBNull.Value; DbType = System.Data.SqlDbType.Int}
         ] (employeeSelect 0)
 
     [<Test>]
@@ -289,7 +289,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName LIKE '%' + @p1 + '%')" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
     [<Test>]
@@ -302,7 +302,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName LIKE @p1 + '%')" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
     [<Test>]
@@ -315,7 +315,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName LIKE '%' + @p1)" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
     [<Test>]
@@ -348,7 +348,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2 WHERE (T2.DepartmentId = @p1)))" [
-            {Name="p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
+            {Name="@p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
         ] (personSelect 0)
 
     [<Test>]
@@ -368,7 +368,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2 WHERE (T2.DepartmentId = @p1)))" [
-            {Name="p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
+            {Name="@p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
         ] (personSelect(0))
 
     [<Test>]
@@ -391,7 +391,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT T.PersonName FROM Person AS T WHERE (T.PersonName = @p1)" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (stringSelect(0))
 
     [<Test>]
@@ -430,7 +430,7 @@ module QueryGenTest =
             } :> obj
 
         AreEqualExpression q "SELECT COUNT(*) FROM Person AS T WHERE (T.PersonName = @p1)"  [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (simpleOneSelect typedefof<int> 0)
 
 
@@ -444,7 +444,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM Person AS T WHERE (T.PersonId = @p1)"  [
-            {Name="p1"; Value=11; DbType = System.Data.SqlDbType.Int}
+            {Name="@p1"; Value=11; DbType = System.Data.SqlDbType.Int}
         ] (simpleOneSelect typedefof<bool> 0)
 
     [<Test>]
@@ -471,10 +471,10 @@ module QueryGenTest =
             @ ["T.PersonId = @p4)"]
 
         AreEqualExpression q (sql |> String.concat("")) [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-            {Name="p2"; Value=0; DbType = System.Data.SqlDbType.Int}
-            {Name="p3"; Value=5; DbType = System.Data.SqlDbType.Int}
-            {Name="p4"; Value=10; DbType = System.Data.SqlDbType.Int}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p2"; Value=0; DbType = System.Data.SqlDbType.Int}
+            {Name="@p3"; Value=5; DbType = System.Data.SqlDbType.Int}
+            {Name="@p4"; Value=10; DbType = System.Data.SqlDbType.Int}
         ] (simpleOneSelect typedefof<bool> 0)
 
     [<Test>]
@@ -488,8 +488,8 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM Person AS T WHERE (T.PersonName = @p1 AND T.PersonId = @p2)" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-            {Name="p2"; Value=11; DbType = System.Data.SqlDbType.Int}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p2"; Value=11; DbType = System.Data.SqlDbType.Int}
         ] (simpleOneSelect typedefof<bool> 0)
 
     [<Test>]
@@ -538,7 +538,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
     [<Test>]
@@ -561,7 +561,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
     [<Test>]
@@ -584,7 +584,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
     [<Test>]
@@ -607,7 +607,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
     [<Test>]
@@ -630,7 +630,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T WHERE (T.PersonName = @p1) ORDER BY T.PersonId ASC" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (intSelect 0)
 
     [<Test>]
@@ -653,7 +653,7 @@ module QueryGenTest =
             } :> obj
         
         AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T WHERE (T.PersonName = @p1) ORDER BY T.PersonId DESC" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (intSelect 0)
 
     [<Test>]
@@ -696,7 +696,7 @@ module QueryGenTest =
 //            } :> obj
 //            
 //        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
-//            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+//            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
 //        ] []
         //the group by must be done clientside
 
@@ -742,7 +742,7 @@ module QueryGenTest =
             } :> obj
             
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1) ORDER BY T.PersonId ASC" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
     [<Test>]
@@ -787,7 +787,7 @@ module QueryGenTest =
             } :> obj
             
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1) ORDER BY T.PersonId DESC" [
-            {Name="p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
 

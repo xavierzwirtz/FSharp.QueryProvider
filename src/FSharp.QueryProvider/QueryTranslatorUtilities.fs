@@ -101,12 +101,12 @@ let rec unwrapType (t : System.Type) =
 
 let createParameter columnIndex value dbType = 
     let p = {
-        PreparedParameter.Name = "p" + columnIndex.ToString()
+        PreparedParameter.Name = "@p" + columnIndex.ToString()
         Value = value
         DbType = dbType
     }
 
-    ["@"; p.Name; ""], [p], List.empty<TypeConstructionInfo>
+    [p.Name; ""], [p], List.empty<TypeConstructionInfo>
 
 let rec unwrapValue value = 
     let t = value.GetType()

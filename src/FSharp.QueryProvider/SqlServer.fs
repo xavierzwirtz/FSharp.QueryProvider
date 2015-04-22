@@ -467,8 +467,10 @@ module SqlServer =
         cmd.CommandText <- preparedStatement.Text
         for param in preparedStatement.Parameters do
             let sqlParam = cmd.CreateParameter()
+            sqlParam.ParameterName <- param.Name
             sqlParam.Value <- param.Value
             sqlParam.SqlDbType <- param.DbType
+            cmd.Parameters.Add(sqlParam) |> ignore
         cmd
 
     let translateToCommand getDBType getTableName getColumnName connection expression =
