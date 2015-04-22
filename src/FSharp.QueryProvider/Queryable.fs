@@ -113,9 +113,10 @@ and [<AbstractClass>] QueryProvider() =
 
     abstract member Execute : Expression -> obj
 
-type DBQueryProvider<'T when 'T :> System.Data.IDbConnection>(connection : 'T, translate : 'T -> Expression -> System.Data.IDbCommand * DataReader.TypeConstructionInfo) =
+type DBQueryProvider<'T when 'T :> System.Data.IDbConnection>(getConnection : unit -> 'T, translate : 'T -> Expression -> System.Data.IDbCommand * DataReader.TypeConstructionInfo) =
     inherit QueryProvider()
     override this.Execute expression =
+        use connection = getConnection()
         let cmd, ctorInfo = translate connection expression
 
 //        let cmd = connection.CreateCommand()
@@ -123,6 +124,8 @@ type DBQueryProvider<'T when 'T :> System.Data.IDbConnection>(connection : 'T, t
 //        let param = cmd.CreateParameter()
 //        param.
 //        cmd.CommandText <- this.Translate(expression)
-
+        
+        connection.Open()
         use reader = cmd.ExecuteReader()
-        DataReader.constructResult reader ctorInfo
+        let res = DataReader.read reader ctorInfo
+        res
