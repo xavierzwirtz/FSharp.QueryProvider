@@ -34,7 +34,7 @@ let rec visit transform (expression : Expression)  =
     visitor.Visit expression
 
 /// <summary>
-/// Walks an expression tree and generates a list<'t>
+/// Walks an expression tree and generates a 't list
 /// </summary>
 /// <param name="mapping"></param>
 /// <param name="expression"></param>
@@ -54,7 +54,7 @@ let rec map (mapping : Expression -> ExpressionResult * 't) (expression : Expres
     !totalResult
 
 /// <summary>
-/// Walks an expression tree and generates a list<'t> while also passing data<'d> down
+/// Walks an expression tree and generates a 't list while also passing 'd data down
 /// </summary>
 /// <param name="mapping"></param>
 /// <param name="expression"></param>
