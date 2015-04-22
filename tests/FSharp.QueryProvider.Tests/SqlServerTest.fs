@@ -58,7 +58,7 @@ let AreEqualTranslateExpression (translate : Expression -> PreparedStatement<_>)
     let ctorEqual =
         let e = expectedResultConstructionInfo
         let a = sqlQuery.ResultConstructionInfo
-        e.ManyOrOne = a.ManyOrOne &&
+        e.ReturnType = a.ReturnType &&
         e.Type = a.Type &&
         compareSeq e.PropertySets a.PropertySets &&
         compareSeq e.ConstructorArgs a.ConstructorArgs
@@ -74,29 +74,31 @@ let AreEqualExpression get = AreEqualTranslateExpression (SqlServer.translate No
 //https://msdn.microsoft.com/en-us/library/vstudio/hh225374.aspx
 module QueryGenTest = 
 
-    let personSelect i = {
-        ManyOrOne = Many
+    let personSelectType returnType i = {
+        ReturnType = returnType
         Type = typedefof<Person>
         ConstructorArgs = [i+0;i+1;i+2;i+3] 
         PropertySets = [] 
     }
+
+    let personSelect = personSelectType Many
     
     let employeeSelect i = {
-        ManyOrOne = Many
+        ReturnType = Many
         Type = typedefof<Employee>
         ConstructorArgs = [i+0;i+1;i+2;i+3;i+4] 
         PropertySets = [] 
     }
 
     let simpleSelect t i = {
-        ManyOrOne = Many
+        ReturnType = Many
         Type = t
         ConstructorArgs = [i] 
         PropertySets = [] 
     }
 
     let simpleOneSelect t i = {
-        ManyOrOne = One
+        ReturnType = Single
         Type = t
         ConstructorArgs = [i] 
         PropertySets = [] 
@@ -114,7 +116,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelect(0))
+        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelect 0)
 
     [<Test>]
     let ``simple where``() =
@@ -526,7 +528,7 @@ module QueryGenTest =
                 exactlyOne
             }
         
-        AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelect 0)
+        AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType Single 0)
 
     [<Test>]
     let ``exactlyOne where``() =
@@ -539,7 +541,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-        ] (personSelect 0)
+        ] (personSelectType Single 0)
 
     [<Test>]
     let ``exactlyOneOrDefault``() =
@@ -549,7 +551,7 @@ module QueryGenTest =
                 exactlyOneOrDefault
             }
         
-        AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelect 0)
+        AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType SingleOrDefault 0)
 
     [<Test>]
     let ``exactlyOneOrDefault where``() =
@@ -562,7 +564,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-        ] (personSelect 0)
+        ] (personSelectType SingleOrDefault 0)
 
     [<Test>]
     let ``head``() =
@@ -572,7 +574,7 @@ module QueryGenTest =
                 head
             }
         
-        AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelect 0)
+        AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType Single 0)
 
     [<Test>]
     let ``head where``() =
@@ -585,7 +587,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-        ] (personSelect 0)
+        ] (personSelectType Single 0)
 
     [<Test>]
     let ``headOrDefault``() =
@@ -595,7 +597,7 @@ module QueryGenTest =
                 headOrDefault
             }
         
-        AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelect 0)
+        AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType SingleOrDefault 0)
 
     [<Test>]
     let ``headOrDefault where``() =
@@ -608,7 +610,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-        ] (personSelect 0)
+        ] (personSelectType Single 0)
 
     [<Test>]
     let ``minBy``() =

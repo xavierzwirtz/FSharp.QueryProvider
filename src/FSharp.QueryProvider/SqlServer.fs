@@ -38,7 +38,7 @@ module SqlServer =
         t.Name
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
-    let createTypeConstructionInfo selectIndex (t : System.Type) manyOrOne =
+    let createTypeConstructionInfo selectIndex (t : System.Type) returnType =
         if Microsoft.FSharp.Reflection.FSharpType.IsRecord t then
             let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields t |> Seq.toList
 
@@ -47,7 +47,7 @@ module SqlServer =
             )
 
             {
-                ManyOrOne = manyOrOne
+                ReturnType = returnType
                 Type = t
                 ConstructorArgs = ctorArgs
                 PropertySets = []
@@ -56,7 +56,7 @@ module SqlServer =
             let x = typedefof<int>
             let simple () = 
                 {
-                    ManyOrOne = manyOrOne
+                    ReturnType = returnType
                     Type = t
                     ConstructorArgs = [selectIndex] 
                     PropertySets = []
@@ -77,7 +77,12 @@ module SqlServer =
                 failwith "not implemented type '%s'" t.Name
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
-    let createTypeSelect (getColumnName : System.Reflection.MemberInfo -> string) (tableAlias : string list) (topSelect : bool) (t : System.Type) =
+    let createTypeSelect 
+        (getColumnName : System.Reflection.MemberInfo -> string) 
+        (tableAlias : string list) 
+        (topSelect : bool) 
+        (returnType : ReturnType)
+        (t : System.Type) =
         // need to call a function here so that this can be extended
         if Microsoft.FSharp.Reflection.FSharpType.IsRecord t then
             let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields t |> Seq.toList
@@ -92,7 +97,7 @@ module SqlServer =
 
             let ctor = 
                 if topSelect then
-                    Some (createTypeConstructionInfo 0 t Many)
+                    Some (createTypeConstructionInfo 0 t returnType)
                 else
                     None
 
@@ -159,8 +164,8 @@ module SqlServer =
             let createNull dbType = 
                 createNull (getColumnNameIndex()) dbType
 
-            let createTypeSelect tableAlias t = 
-                let q, ctorOption = createTypeSelect getColumnName tableAlias context.TopSelect t
+            let createTypeSelect tableAlias returnType t = 
+                let q, ctorOption = createTypeSelect getColumnName tableAlias context.TopSelect returnType t
                 let c = 
                     match ctorOption with
                     | None -> []
@@ -246,18 +251,26 @@ module SqlServer =
                         let tableAlias = (getTableAlias())
                         let map e = 
                             mapd {TableAlias = Some tableAlias; TopSelect = false} e
-                        let createTypeSelect t =
-                            createTypeSelect tableAlias t
+                        let createTypeSelect t = 
+                            let returnType = 
+                                let isSome l = l |> List.exists(fun (m : option<_>)-> m.IsSome)
+                                if [single; first] |> isSome then
+                                    Single
+                                else if [singleOrDefault; firstOrDefault] |> isSome then
+                                    SingleOrDefault
+                                else
+                                    Many
+                            createTypeSelect tableAlias returnType t
 
                         let star = ["* "], []
                         let selectColumn, selectParameters, selectCtor = 
                             match count with
                             | Some c-> 
-                                ["COUNT(*) "], [], [createTypeConstructionInfo 0 typedefof<int> One]
+                                ["COUNT(*) "], [], [createTypeConstructionInfo 0 typedefof<int> Single]
                             | None -> 
                                 match contains with 
                                 | Some c -> 
-                                    ["CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END "], [] , [createTypeConstructionInfo 0 typedefof<bool> One]
+                                    ["CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END "], [] , [createTypeConstructionInfo 0 typedefof<bool> Single]
                                 | None -> 
                                     let partialSelect (l : LambdaExpression) =
                                         let t = l.ReturnType

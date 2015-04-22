@@ -6,7 +6,7 @@ open FSharp.QueryProvider.DataReader
 open Models
 open LocalDataReader
 
-type SimpleRecord = {
+type VerboseRecord = {
     String : string
     Bool : bool
     Byte : byte
@@ -21,9 +21,17 @@ type SimpleRecord = {
     Int64 : int64
 }
 
+type Name = {
+    Value : string
+}
+
+type OptionName = {
+    OptionValue : string option
+}
+
 let ctorOneSimple t = 
     {
-        ManyOrOne = One
+        ReturnType = Single
         Type = t
         ConstructorArgs = [0;]
         PropertySets = []
@@ -31,16 +39,32 @@ let ctorOneSimple t =
 
 let ctorManySimple t = 
     {
-        ManyOrOne = Many
+        ReturnType = Many
         Type = t
         ConstructorArgs = [0]
         PropertySets = []
     }
 
-let ctorSimpleRecord manyOrOne = 
+let ctorName returnType =
     {
-        ManyOrOne = manyOrOne
-        Type = typedefof<SimpleRecord>
+        ReturnType = returnType
+        Type = typedefof<Name>
+        ConstructorArgs = [0;]
+        PropertySets = []
+    }
+
+let ctorOptionName returnType =
+    {
+        ReturnType = returnType
+        Type = typedefof<OptionName>
+        ConstructorArgs = [0;]
+        PropertySets = []
+    }
+
+let ctorVerboseRecord returnType = 
+    {
+        ReturnType = returnType
+        Type = typedefof<VerboseRecord>
         ConstructorArgs = [0..11]
         PropertySets = []
     }
@@ -126,7 +150,7 @@ let ``many string``() =
     areSeqEqual ["foo"; "bar"] result
 
 [<Test>]
-let ``one record``() =
+let ``one verbose record``() =
     let d = System.DateTime.Now
     let g = System.Guid.NewGuid()
 
@@ -148,7 +172,7 @@ let ``one record``() =
             ]]
         )
 
-    let result = (read reader (ctorSimpleRecord One)) :?> SimpleRecord
+    let result = (read reader (ctorVerboseRecord Single)) :?> VerboseRecord
     let e = {
         String = "foobar"
         Bool = true
@@ -167,7 +191,7 @@ let ``one record``() =
     Assert.AreEqual(e, result)
 
 [<Test>]
-let ``many record``() =
+let ``many verbose record``() =
     let d = System.DateTime.Now
     let g = System.Guid.NewGuid()
 
@@ -202,7 +226,7 @@ let ``many record``() =
             ]]
         )
 
-    let result = (read reader (ctorSimpleRecord Many)) :?> SimpleRecord seq
+    let result = (read reader (ctorVerboseRecord Many)) :?> VerboseRecord seq
     let e = [
         {
             String = "foobar"
@@ -234,3 +258,72 @@ let ``many record``() =
     ]
 
     areSeqEqual e result
+
+[<Test>]
+let ``single record``() =
+
+    let reader = 
+        new LocalDataReader([["first"]])
+
+    let result = (read reader (ctorName Single)) :?> Name
+
+    Assert.AreEqual({Value = "first"}, result)
+
+[<Test>]
+let ``single record multiple values throws``() =
+
+    let reader = 
+        new LocalDataReader([["first"]; ["second"]])
+
+    let e = Assert.Throws<System.InvalidOperationException>(fun () -> (read reader (ctorName Single)) |> ignore)
+
+    Assert.AreEqual("Sequence contains more than one element", e.Message)
+
+[<Test>]
+let ``single record no values throws``() =
+
+    let reader = 
+        new LocalDataReader([])
+
+    let e = Assert.Throws<System.InvalidOperationException>(fun () -> (read reader (ctorName Single)) |> ignore)
+
+    Assert.AreEqual("Sequence contains no elements", e.Message)
+
+let ``singleOrDefault record``() =
+
+    let reader = 
+        new LocalDataReader([["first"]])
+
+    let result = (read reader (ctorName SingleOrDefault)) :?> Name
+
+    Assert.AreEqual({Value = "first"}, result)
+
+[<Test>]
+let ``singleOrDefault record multiple values throws``() =
+
+    let reader = 
+        new LocalDataReader([["first"]; ["second"]])
+
+    let e = Assert.Throws<System.InvalidOperationException>(fun () -> (read reader (ctorName SingleOrDefault)) |> ignore)
+
+    Assert.AreEqual("Sequence contains more than one element", e.Message)
+
+[<Test>]
+let ``singleOrDefault record no values defaults``() =
+
+    let reader = 
+        new LocalDataReader([])
+
+    let result = (read reader (ctorName SingleOrDefault))
+
+    Assert.AreEqual(null, result)
+
+[<Test>]
+let ``tuple value``() =
+
+    let reader = 
+        new LocalDataReader([["first"]])
+
+    let result = (read reader (ctorOptionName Single)) :?> OptionName
+
+    Assert.AreEqual({OptionValue = Some "first"}, result)

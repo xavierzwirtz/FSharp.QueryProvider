@@ -3,13 +3,15 @@
 open System.Collections
 open Microsoft.FSharp.Reflection
 
-type ManyOrOne = 
+type ReturnType = 
+| Single
+| SingleOrDefault
 | Many
-| One
+// | Group of GroupExpression
 
 type TypeConstructionInfo = {
-    ManyOrOne : ManyOrOne
     Type : System.Type
+    ReturnType : ReturnType
     ConstructorArgs : int seq
     PropertySets : (int * System.Reflection.PropertyInfo) seq
 }
@@ -65,7 +67,7 @@ let read (reader : System.Data.IDataReader) (typeCtor : TypeConstructionInfo) : 
     let constructResult () = 
         constructResult reader typeCtor
          
-    match typeCtor.ManyOrOne with
+    match typeCtor.ReturnType with
     | Many -> 
         let listT = typedefof<System.Collections.Generic.List<_>>
         let conListT = listT.MakeGenericType([| typeCtor.Type |])
@@ -75,9 +77,18 @@ let read (reader : System.Data.IDataReader) (typeCtor : TypeConstructionInfo) : 
             let res = constructResult()
             addM.Invoke(inst, [|res|]) |> ignore
         inst
-    | One -> 
-        let readResult = reader.Read()
-        if readResult then
-            constructResult()
+    | Single | SingleOrDefault ->
+        if reader.Read() then
+            let r = constructResult()
+            if reader.Read() then
+                raise (System.InvalidOperationException "Sequence contains more than one element")
+            r
         else
-            null
+            match typeCtor.ReturnType with
+            | Single -> raise (System.InvalidOperationException "Sequence contains no elements")
+            | SingleOrDefault -> 
+                if typeCtor.Type.IsValueType then
+                    System.Activator.CreateInstance(typeCtor.Type)
+                else
+                    null
+            | _ -> failwith "shouldnt be here"
