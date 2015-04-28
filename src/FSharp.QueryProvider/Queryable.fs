@@ -113,13 +113,26 @@ and [<AbstractClass>] QueryProvider() =
 
     abstract member Execute : Expression -> obj
 
-type DBQueryProvider<'T when 'T :> System.Data.IDbConnection>(getConnection : unit -> 'T, translate : 'T -> Expression -> System.Data.IDbCommand * DataReader.TypeConstructionInfo) =
-    
+type DBQueryProvider<'T when 'T :> System.Data.IDbConnection>
+    (
+    getConnection : unit -> 'T, 
+    translate : 'T -> Expression -> System.Data.IDbCommand * DataReader.TypeConstructionInfo,
+    onExecutingCommand : option<System.Data.IDbCommand -> System.Data.IDbCommand * obj>,
+    onExecutedCommand : option<System.Data.IDbCommand * obj -> unit>
+    ) =
     inherit QueryProvider()
+    
     override this.Execute expression =
         use connection = getConnection()
         let cmd, ctorInfo = translate connection expression
+
+        let cmd, userState = 
+            match onExecutingCommand with
+            | None -> cmd, null
+            | Some x -> x cmd
+
         connection.Open()
         use reader = cmd.ExecuteReader()
         let res = DataReader.read reader ctorInfo
+        if onExecutedCommand.IsSome then onExecutedCommand.Value(cmd, userState)
         res

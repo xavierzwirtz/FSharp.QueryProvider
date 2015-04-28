@@ -73,27 +73,6 @@ module SqlServer =
                     PropertySets = []
                 }
             else
-//                let x = typedefof<int>
-//                let simple () = 
-//                    {
-//                        ReturnType = returnType
-//                        Type = t
-//                        ConstructorArgs = [selectIndex] 
-//                        PropertySets = []
-//                    }
-//                let simpleTypes = [
-//                    typedefof<int16>
-//                    typedefof<int>
-//                    typedefof<int64>
-//                    typedefof<float>
-//                    typedefof<decimal>
-//                    typedefof<string>
-//                    typedefof<System.DateTime>
-//                    typedefof<bool>
-//                ]
-//                if simpleTypes |> List.exists ((=) t) then
-                //    simple()
-                //else
                 failwith "not implemented type '%s'" t.Name
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
@@ -458,16 +437,13 @@ module SqlServer =
                         | _ -> None
                     if q <> None then
                         let q = q.Value
-                        failwith "dont think this should ever get hit"
-                        //Some ["SELECT * FROM "; q.ElementType.Name]
+                        failwith "This should ever get hit"
                     else if c.Value = null then
                         Some (["NULL"] ,[], [])
                     else
                         Some (valueToQueryAndParam (getDBType (TypeSource.Value c.Value)) c.Value)
                 | MemberAccess m ->
-//                    failwith "should be handled explicitly"
                     if m.Expression <> null && m.Expression.NodeType = ExpressionType.Parameter then
-                        //this needs to call a function to determine column name for extensibility.    
                         match context.TableAlias with
                         | Some tableAlias -> Some (tableAlias @ ["."; getColumnName(m.Member)], [], [])
                         | None -> failwith "cannot access member without tablealias being genned"
