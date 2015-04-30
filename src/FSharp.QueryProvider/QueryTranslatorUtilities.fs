@@ -3,8 +3,13 @@
 open FSharp.QueryProvider.DataReader
 open FSharp.QueryProvider.PreparedQuery
 open FSharp.QueryProvider.Expression
+open FSharp.QueryProvider.ExpressionMatching
 open System.Linq.Expressions
+
 open Microsoft.FSharp.Reflection
+
+type IQueryable = System.Linq.IQueryable
+type IQueryable<'T> = System.Linq.IQueryable<'T>
 
 module List =
     let interpolate (toInsert : 'T list) (list : 'T list) : 'T list=
@@ -125,3 +130,73 @@ let createNull (columnIndex : int) (dbType : DBType<_>) =
     | Unhandled -> failwith "Shouldnt ever get to this point with this value" 
     | DataType dbType ->
         createParameter columnIndex System.DBNull.Value dbType
+
+let getOperationsAndQueryable e : option<IQueryable * MethodCallExpression list> =
+    let rec get (e : MethodCallExpression) : option<IQueryable option * MethodCallExpression list> = 
+        match e with
+        | CallIQueryable(e, q, _args) -> 
+            match q with
+            | Constant c -> Some(Some(c.Value :?> IQueryable), [e])
+            | Call m -> 
+                let r = get(m)
+                match r with 
+                | Some (q, m) -> 
+                    Some (q, m |> List.append([e]))
+                | None -> None
+            | _ -> failwithf "not implemented nodetype '%A'" q.NodeType
+        | _ ->
+            if e.Arguments.Count = 0 then
+                if typedefof<IQueryable>.IsAssignableFrom e.Type then
+                    Some (Some (invoke(e) :?> IQueryable), [])
+                else
+                    None
+            else
+                None
+
+    let result = get e
+    match result with 
+    | None -> None
+    | Some result -> 
+        Some(fst(result).Value, snd(result))
+
+open System.Reflection
+let getLocalValue (e : Expression) : obj option =
+
+    let rec getChain (e : Expression) : option<obj * MemberExpression list> = 
+        match e with 
+        | MemberAccess m -> 
+            match m.Expression with 
+            | Constant c ->
+                Some (c.Value, [m])
+            | MemberAccess ma ->
+                match getChain ma with 
+                | Some (c, ml) -> 
+                    Some (c, ml |> List.append([m]))
+                | None -> None
+            | Call call -> Some (invoke call, [m])
+            | _ -> None
+        | _ -> None
+
+    match getChain e with
+    | Some (root, accesses) -> 
+        let result = 
+            accesses
+            |> List.rev
+            |> List.fold(fun state item ->
+                if item.Member.MemberType = MemberTypes.Property then
+                    let prop = item.Member :?> PropertyInfo
+                    prop.GetValue(state,[||])
+                else if item.Member.MemberType = MemberTypes.Field then //ew field
+                    let field = item.Member :?> FieldInfo
+                    field.GetValue(state)
+                else
+                    failwithf "not implemented member type '%A'" item.Member.MemberType
+            ) root
+        Some result
+    | None -> None
+
+//    match result with 
+//    | None -> None
+//    | Some result -> 
+//        Some(fst(result).Value, snd(result))
+

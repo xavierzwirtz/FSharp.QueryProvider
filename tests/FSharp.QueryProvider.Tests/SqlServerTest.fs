@@ -8,6 +8,8 @@ open FSharp.QueryProvider.Engines
 
 open Models
 
+type IQueryable = System.Linq.IQueryable
+type IQueryable<'T> = System.Linq.IQueryable<'T>
 type Expression = System.Linq.Expressions.Expression
 
 let provider = EmptyQueryProvider.EmptyQueryProvider()
@@ -73,6 +75,15 @@ let AreEqualExpression get = AreEqualTranslateExpression (SqlServer.translate No
 //http://fsprojects.github.io/FSharp.Linq.ComposableQuery/QueryExamples.html
 //https://msdn.microsoft.com/en-us/library/vstudio/hh225374.aspx
 module QueryGenTest = 
+
+    type Value = {
+        Value : string
+    }
+    type TopValue = {
+        SubValue : Value
+    }
+    type MutableObject() = 
+        [<DefaultValue>] val mutable Value : string
 
     let personSelectType returnType i = 
         createTypeConstructionInfo typedefof<Person> returnType ([0..3] |> Seq.map(fun v -> Value (i + v))) []
@@ -194,6 +205,54 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
             {Name="@p1"; Value=(!name); DbType = System.Data.SqlDbType.NVarChar}
+        ] (personSelect 0)
+
+    [<Test>]
+    let ``where property access``() =
+        
+        let value = { SubValue = {Value = "john" } }
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                where(p.PersonName = value.SubValue.Value)
+                select p
+            }
+        
+        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+            {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
+        ] (personSelect 0)
+
+    [<Test>]
+    let ``where field access``() =
+        
+        let value = MutableObject()
+        value.Value <- "john"
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                where(p.PersonName = value.Value)
+                select p
+            }
+        
+        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+            {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
+        ] (personSelect 0)
+
+    [<Test>]
+    let ``where func property access``() =
+        
+        let f () = 
+            { SubValue = {Value = "john" } }
+
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                where(p.PersonName = f().SubValue.Value)
+                select p
+            }
+        
+        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+            {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
     [<Test>]

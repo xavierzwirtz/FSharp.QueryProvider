@@ -1,7 +1,5 @@
 ﻿namespace FSharp.QueryProvider.Engines
 
-type IQueryable = System.Linq.IQueryable
-type IQueryable<'T> = System.Linq.IQueryable<'T>
 type SqlDbType = System.Data.SqlDbType
 
 open System.Linq.Expressions
@@ -175,34 +173,6 @@ module SqlServer =
                 let leftSql, leftParams, leftCtor = map(e.Left)
                 let rightSql, rightParams, rightCtor = map(e.Right)
                 Some (leftSql @ [" "; text; " "] @ rightSql, leftParams @ rightParams, leftCtor @ rightCtor)
-
-            let getOperationsAndQueryable e : option<IQueryable * MethodCallExpression list> =
-                let rec get (e : MethodCallExpression) : option<IQueryable option * MethodCallExpression list> = 
-                    match e with
-                    | CallIQueryable(e, q, _args) -> 
-                        match q with
-                        | Constant c -> Some(Some(c.Value :?> IQueryable), [e])
-                        | Call m -> 
-                            let r = get(m)
-                            match r with 
-                            | Some r -> 
-                                Some (fst(r), snd(r) |> List.append([e]))
-                            | None -> None
-                        | _ -> failwithf "not implemented nodetype '%A'" q.NodeType
-                    | _ ->
-                        if e.Arguments.Count = 0 then
-                            if typedefof<IQueryable>.IsAssignableFrom e.Type then
-                                Some (Some (invoke(e) :?> IQueryable), [])
-                            else
-                                None
-                        else
-                            None
-
-                let result = get e
-                match result with 
-                | None -> None
-                | Some result -> 
-                    Some(fst(result).Value, snd(result))
 
             let result : option<string list * PreparedParameter<_> list * TypeConstructionInfo list>= 
                 match e with
@@ -452,7 +422,19 @@ module SqlServer =
                         | Some tableAlias -> Some (tableAlias @ ["."; getColumnName(m.Member)], [], [])
                         | None -> failwith "cannot access member without tablealias being genned"
                     else
-                        failwithf "The member '%s' is not supported" m.Member.Name
+                        match getLocalValue m with
+                        | Some (value) -> 
+                            let param = valueToQueryAndParam (getDBType (TypeSource.Value value)) value
+                            Some (param)
+                        | None -> failwithf "The member '%s' is not supported" m.Member.Name
+//                        let accessChain = getConstantAccessChain m
+//                        printfn "%A" accessChain
+                        
+//                        match accessChain with
+//                        | Some constant, accesses ->
+//                            failwith "foobar"
+//                        | None -> 
+//                            failwithf "The member '%s' is not supported" m.Member.Name
                 | _ -> None
 
             match result with
