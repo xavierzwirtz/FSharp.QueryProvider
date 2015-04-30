@@ -58,14 +58,14 @@ type Query<'T>(provider : QueryProvider, expression : Expression option) as this
         | None -> Expression.Constant(this) :> Expression
         | Some x -> x
 
-    member this.provider = provider
-    member this.expression = hardExpression
+    member __.provider = provider
+    member __.expression = hardExpression
 
     interface IQueryable<'T> with
-        member this.Expression =
+        member __.Expression =
             hardExpression
         
-        member this.ElementType =
+        member __.ElementType =
             typedefof<'T>
     
         member this.Provider = 
@@ -82,7 +82,7 @@ type Query<'T>(provider : QueryProvider, expression : Expression option) as this
             let x = this.provider.Execute(hardExpression) :?> IEnumerable<'T>
             x.GetEnumerator()
 
-    override this.ToString () =
+    override __.ToString () =
         match expression with 
         | Some e -> e.ToString()
         | None -> sprintf "value(Query<%s>)" typedefof<'T>.Name
@@ -122,7 +122,7 @@ type DBQueryProvider<'T when 'T :> System.Data.IDbConnection>
     ) =
     inherit QueryProvider()
     
-    override this.Execute expression =
+    override __.Execute expression =
         use connection = getConnection()
         let cmd, ctorInfo = translate connection expression
 

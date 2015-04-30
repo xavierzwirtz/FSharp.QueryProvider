@@ -84,11 +84,11 @@ module QueryGenTest =
             Type (createTypeConstructionInfo t Single ([Value i]) [])
          
         let ctorArgs = [
-            createSome (Some(1).GetType()) 0 
-            createSome (Some("").GetType()) 1
-            createSome (Some(1).GetType()) 2
-            createSome (Some(1).GetType()) 3
-            Value 4
+            createSome (Some(1).GetType()) (0 + i) 
+            createSome (Some("").GetType()) (1 + i)
+            createSome (Some(1).GetType()) (2 + i)
+            createSome (Some(1).GetType()) (3 + i)
+            Value (4 + i)
         ]
         createTypeConstructionInfo typedefof<Employee> Many ctorArgs []
 
@@ -418,7 +418,7 @@ module QueryGenTest =
         
         let q = fun (persons : IQueryable<Person>) -> 
             query {
-                for p in persons do
+                for _p in persons do
                 count
             }
 
@@ -437,6 +437,18 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (simpleOneSelect typedefof<int> 0)
 
+    [<Test>]
+    let ``exists``() =
+        
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                exists(p.PersonName = "john")
+            }
+
+        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM Person AS T WHERE (T.PersonName = @p1)"  [
+            {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+        ] (simpleOneSelect typedefof<bool> 0)
 
     [<Test>]
     let ``contains col``() =
@@ -463,7 +475,7 @@ module QueryGenTest =
 
         let q = fun (persons : IQueryable<Person>) -> 
             query {
-                for p in persons do
+                for _p in persons do
                 contains e
             }
 
@@ -500,7 +512,7 @@ module QueryGenTest =
     let ``last throws``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
-                for p in persons do
+                for _p in persons do
                 last
             }
         
@@ -513,7 +525,7 @@ module QueryGenTest =
     let ``lastOrDefault``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
-                for p in persons do
+                for _p in persons do
                 lastOrDefault
             }
         
@@ -526,7 +538,7 @@ module QueryGenTest =
     let ``exactlyOne``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
-                for p in persons do
+                for _p in persons do
                 exactlyOne
             }
         
@@ -549,7 +561,7 @@ module QueryGenTest =
     let ``exactlyOneOrDefault``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
-                for p in persons do
+                for _p in persons do
                 exactlyOneOrDefault
             }
         
@@ -572,7 +584,7 @@ module QueryGenTest =
     let ``head``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
-                for p in persons do
+                for _p in persons do
                 head
             }
         
@@ -595,7 +607,7 @@ module QueryGenTest =
     let ``headOrDefault``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
-                for p in persons do
+                for _p in persons do
                 headOrDefault
             }
         

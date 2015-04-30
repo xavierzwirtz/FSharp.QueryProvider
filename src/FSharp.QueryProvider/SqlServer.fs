@@ -30,7 +30,7 @@ module SqlServer =
         | System.TypeCode.Int16 -> DataType SqlDbType.SmallInt
         | System.TypeCode.Int32 -> DataType SqlDbType.Int
         | System.TypeCode.Int64 -> DataType SqlDbType.BigInt
-        | t -> Unhandled
+        | _t -> Unhandled
 
     let defaultGetTableName (t:System.Type) : string =
         t.Name
@@ -179,7 +179,7 @@ module SqlServer =
             let getOperationsAndQueryable e : option<IQueryable * MethodCallExpression list> =
                 let rec get (e : MethodCallExpression) : option<IQueryable option * MethodCallExpression list> = 
                     match e with
-                    | CallIQueryable(e, q, args) -> 
+                    | CallIQueryable(e, q, _args) -> 
                         match q with
                         | Constant c -> Some(Some(c.Value :?> IQueryable), [e])
                         | Call m -> 
@@ -188,7 +188,7 @@ module SqlServer =
                             | Some r -> 
                                 Some (fst(r), snd(r) |> List.append([e]))
                             | None -> None
-                        | x -> failwithf "not implemented nodetype '%A'" q.NodeType
+                        | _ -> failwithf "not implemented nodetype '%A'" q.NodeType
                     | _ ->
                         if e.Arguments.Count = 0 then
                             if typedefof<IQueryable>.IsAssignableFrom e.Type then
@@ -225,7 +225,14 @@ module SqlServer =
                         let firstOrDefault, ml = getMethod "FirstOrDefault" ml
                         let max, ml = getMethod "Max" ml
                         let min, ml = getMethod "Min" ml
+                        let any, ml = getMethod "Any" ml
                         
+                        let wheres = 
+                            match any with 
+                            | None -> wheres
+                            | Some any -> 
+                                wheres @ [any]
+
                         let sorts, ml= getMethods ["OrderBy"; "OrderByDescending"; "ThenBy"; "ThenByDescending"] ml
                         let sorts, maxOrMin = 
                             let m = 
@@ -261,16 +268,14 @@ module SqlServer =
                                     Many
                             createTypeSelect tableAlias returnType t
 
-                        let star = ["* "], []
                         let selectColumn, selectParameters, selectCtor = 
                             match count with
-                            | Some c-> 
+                            | Some _-> 
                                 ["COUNT(*) "], [], [createTypeConstructionInfo 0 typedefof<int> Single]
                             | None -> 
-                                match contains with 
-                                | Some c -> 
+                                if contains.IsSome || any.IsSome then
                                     ["CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END "], [] , [createTypeConstructionInfo 0 typedefof<bool> Single]
-                                | None -> 
+                                else
                                     let partialSelect (l : LambdaExpression) =
                                         let t = l.ReturnType
                                         let c = 
@@ -326,7 +331,7 @@ module SqlServer =
                                                 | Call m when(m.Method.Name = "Contains") ->
                                                     //(PersonId IN (SELECT PersonID FROM Employee))
                                                     match m with 
-                                                    | CallIQueryable(m,q,rest) ->  
+                                                    | CallIQueryable(_m, q, rest) ->  
                                                         let containsVal = rest |> Seq.head
                                                         match containsVal with
                                                         | MemberAccess a -> 
@@ -336,7 +341,7 @@ module SqlServer =
                                                         | _ -> 
                                                             None
                                                     | _ -> None
-                                                | b -> None
+                                                | _ -> None
                                             match x with
                                             | None -> 
                                                 let q, p, c = b |> map
@@ -436,7 +441,6 @@ module SqlServer =
                         | :? IQueryable as v -> Some v
                         | _ -> None
                     if q <> None then
-                        let q = q.Value
                         failwith "This should ever get hit"
                     else if c.Value = null then
                         Some (["NULL"] ,[], [])

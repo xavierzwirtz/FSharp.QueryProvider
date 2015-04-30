@@ -25,6 +25,7 @@
     <DocumentationFile>.\bin\Debug\FSharp.QueryProvider.xml</DocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors />
+    <OtherFlags>--warnon:1182</OtherFlags>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -50,7 +51,6 @@
     <Compile Include="DataReader.fs" />
     <Compile Include="PreparedQuery.fs" />
     <Compile Include="Queryable.fs" />
-    <Compile Include="Library.fs" />
     <Compile Include="ExpressionMatching.fs" />
     <Compile Include="Expression.fs" />
     <Compile Include="QueryTranslatorUtilities.fs" />

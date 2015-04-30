@@ -31,19 +31,19 @@ type LocalDataReader(data : obj list list) =
         member x.GetByte(i: int): byte = 
             field i :?> byte
         
-        member x.GetBytes(i: int, fieldOffset: int64, buffer: byte [], bufferoffset: int, length: int): int64 = 
+        member x.GetBytes(_i: int, _fieldOffset: int64, _buffer: byte [], _bufferoffset: int, _length: int): int64 = 
             failwith "Not implemented yet"
         
         member x.GetChar(i: int): char = 
             field i :?> char
         
-        member x.GetChars(i: int, fieldoffset: int64, buffer: char [], bufferoffset: int, length: int): int64 = 
+        member x.GetChars(_i: int, _fieldoffset: int64, _buffer: char [], _bufferoffset: int, _length: int): int64 = 
             failwith "Not implemented yet"
         
-        member x.GetData(i: int): IDataReader = 
+        member x.GetData(_i: int): IDataReader = 
             failwith "Not implemented yet"
         
-        member x.GetDataTypeName(i: int): string = 
+        member x.GetDataTypeName(_i: int): string = 
             failwith "Not implemented yet"
         
         member x.GetDateTime(i: int): System.DateTime = 
@@ -73,10 +73,10 @@ type LocalDataReader(data : obj list list) =
         member x.GetInt64(i: int): int64 = 
             field i :?> int64
         
-        member x.GetName(i: int): string = 
+        member x.GetName(_i: int): string = 
             failwith "Not implemented yet"
         
-        member x.GetOrdinal(name: string): int = 
+        member x.GetOrdinal(_name: string): int = 
             failwith "Not implemented yet"
         
         member x.GetSchemaTable(): DataTable = 
@@ -88,7 +88,7 @@ type LocalDataReader(data : obj list list) =
         member x.GetValue(i: int): obj = 
             field i
         
-        member x.GetValues(values: obj []): int = 
+        member x.GetValues(_values: obj []): int = 
             failwith "Not implemented yet"
         
         member x.IsClosed: bool = 
@@ -104,7 +104,7 @@ type LocalDataReader(data : obj list list) =
                 (x :> IDataReader).GetValue i
         
         member x.Item
-            with get (name: string): obj = 
+            with get (_name: string): obj = 
                 failwith "Not implemented yet"
         
         member x.NextResult(): bool = 
