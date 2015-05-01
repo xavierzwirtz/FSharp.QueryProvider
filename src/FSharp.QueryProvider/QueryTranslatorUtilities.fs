@@ -194,9 +194,3 @@ let getLocalValue (e : Expression) : obj option =
             ) root
         Some result
     | None -> None
-
-//    match result with 
-//    | None -> None
-//    | Some result -> 
-//        Some(fst(result).Value, snd(result))
-

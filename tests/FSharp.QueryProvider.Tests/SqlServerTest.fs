@@ -505,7 +505,7 @@ module QueryGenTest =
                 exists(p.PersonName = "john")
             }
 
-        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM Person AS T WHERE (T.PersonName = @p1)"  [
+        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END FROM Person AS T WHERE (T.PersonName = @p1)"  [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (simpleOneSelect typedefof<bool> 0)
 
@@ -518,7 +518,7 @@ module QueryGenTest =
                 contains 11
             }
         
-        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM Person AS T WHERE (T.PersonId = @p1)"  [
+        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END FROM Person AS T WHERE (T.PersonId = @p1)"  [
             {Name="@p1"; Value=11; DbType = System.Data.SqlDbType.Int}
         ] (simpleOneSelect typedefof<bool> 0)
 
@@ -539,7 +539,7 @@ module QueryGenTest =
             }
 
         let sql = 
-            ["SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM Person AS T WHERE ("]
+            ["SELECT CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END FROM Person AS T WHERE ("]
             @ ["T.PersonName = @p1 AND "]
             @ ["T.JobKind = @p2 AND "]
             @ ["T.VersionNo = @p3 AND "]
@@ -562,7 +562,7 @@ module QueryGenTest =
                 contains 11
             }
         
-        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM Person AS T WHERE (T.PersonName = @p1 AND T.PersonId = @p2)" [
+        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END FROM Person AS T WHERE (T.PersonName = @p1 AND T.PersonId = @p2)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
             {Name="@p2"; Value=11; DbType = System.Data.SqlDbType.Int}
         ] (simpleOneSelect typedefof<bool> 0)

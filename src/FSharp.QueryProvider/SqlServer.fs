@@ -244,7 +244,7 @@ module SqlServer =
                                 ["COUNT(*) "], [], [createTypeConstructionInfo 0 typedefof<int> Single]
                             | None -> 
                                 if contains.IsSome || any.IsSome then
-                                    ["CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END "], [] , [createTypeConstructionInfo 0 typedefof<bool> Single]
+                                    ["CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END "], [] , [createTypeConstructionInfo 0 typedefof<bool> Single]
                                 else
                                     let partialSelect (l : LambdaExpression) =
                                         let t = l.ReturnType
