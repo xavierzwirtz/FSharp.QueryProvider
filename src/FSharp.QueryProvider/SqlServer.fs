@@ -253,7 +253,7 @@ module SqlServer =
                                                 [createTypeConstructionInfo 0 t Many]
                                             else
                                                 []
-                                        let q, p, _ = (getLambda(m).Body |> map) 
+                                        let q, p, _ = (l.Body |> map) 
                                         q @ [" "], p, c
                                     match maxOrMin with 
                                     | Some m ->

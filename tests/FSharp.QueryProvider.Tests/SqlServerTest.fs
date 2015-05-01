@@ -604,6 +604,17 @@ module QueryGenTest =
         AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType Single 0)
 
     [<Test>]
+    let ``exactlyOne partial select``() =
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                select(p.PersonId)
+                exactlyOne
+            }
+        
+        AreEqualExpression q "SELECT TOP 2 T.PersonId FROM Person AS T" [] (intSelect 0)
+
+    [<Test>]
     let ``exactlyOne where``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -625,6 +636,17 @@ module QueryGenTest =
             }
         
         AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType SingleOrDefault 0)
+
+    [<Test>]
+    let ``exactlyOneOrDefault partial select``() =
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                select(p.PersonId)
+                exactlyOneOrDefault
+            }
+        
+        AreEqualExpression q "SELECT TOP 2 T.PersonId FROM Person AS T" [] (intSelect 0)
 
     [<Test>]
     let ``exactlyOneOrDefault where``() =

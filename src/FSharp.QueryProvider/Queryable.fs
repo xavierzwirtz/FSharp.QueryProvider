@@ -123,16 +123,21 @@ type DBQueryProvider<'T when 'T :> System.Data.IDbConnection>
     inherit QueryProvider()
     
     override __.Execute expression =
-        use connection = getConnection()
-        let cmd, ctorInfo = translate connection expression
+        try
+            use connection = getConnection()
+            let cmd, ctorInfo = translate connection expression
 
-        let cmd, userState = 
-            match onExecutingCommand with
-            | None -> cmd, null
-            | Some x -> x cmd
+            let cmd, userState = 
+                match onExecutingCommand with
+                | None -> cmd, null
+                | Some x -> x cmd
 
-        connection.Open()
-        use reader = cmd.ExecuteReader()
-        let res = DataReader.read reader ctorInfo
-        if onExecutedCommand.IsSome then onExecutedCommand.Value(cmd, userState)
-        res
+            connection.Open()
+            use reader = cmd.ExecuteReader()
+            let res = DataReader.read reader ctorInfo
+            if onExecutedCommand.IsSome then onExecutedCommand.Value(cmd, userState)
+            res
+        with 
+        | e -> 
+            printfn "Exception during query Execute: %s" (e.ToString())
+            raise e
