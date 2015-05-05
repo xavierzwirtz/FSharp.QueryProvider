@@ -70,7 +70,7 @@ let AreEqualTranslateExpression (translate : Expression -> PreparedStatement<_>)
 
     printfn "%s" (sqlQuery.FormattedText)
 
-let AreEqualExpression get = AreEqualTranslateExpression (SqlServer.translate None None None) get
+let AreEqualExpression get = AreEqualTranslateExpression (QueryTranslator.translate QueryTranslator.SqlServer2012 None None None) get
 //use for test data:
 //http://fsprojects.github.io/FSharp.Linq.ComposableQuery/QueryExamples.html
 //https://msdn.microsoft.com/en-us/library/vstudio/hh225374.aspx
@@ -156,7 +156,7 @@ module QueryGenTest =
             }
         
         let translate = 
-            SqlServer.translate None None (Some (fun m ->
+            QueryTranslator.translate QueryTranslator.SqlServer2012 None None (Some (fun m ->
                 if m.Name = "PersonName" then
                     Some (m.Name + "Mod")
                 else
@@ -182,7 +182,7 @@ module QueryGenTest =
             }
         
         let translate = 
-            SqlServer.translate None (Some (fun t ->
+            QueryTranslator.translate QueryTranslator.SqlServer2012 None (Some (fun t ->
                 if t.Name = "Person" then
                     Some (t.Name + "Mod")
                 else
@@ -577,7 +577,7 @@ module QueryGenTest =
         
         let e = getExpression q
         let exc = Assert.Throws(fun () -> 
-            SqlServer.translate None None None e |> ignore)
+            QueryTranslator.translate QueryTranslator.SqlServer2012 None None None e |> ignore)
         Assert.AreEqual(exc.Message, "'last' operator has no translations for Sql Server")
 
     [<Test>]
@@ -590,7 +590,7 @@ module QueryGenTest =
         
         let e = getExpression q
         let exc = Assert.Throws(fun () -> 
-            SqlServer.translate None None None e |> ignore)
+            QueryTranslator.translate QueryTranslator.SqlServer2012 None None None e |> ignore)
         Assert.AreEqual(exc.Message, "'lastOrDefault' operator has no translations for Sql Server")
 
     [<Test>]

@@ -54,7 +54,7 @@
     <Compile Include="ExpressionMatching.fs" />
     <Compile Include="Expression.fs" />
     <Compile Include="QueryTranslatorUtilities.fs" />
-    <Compile Include="SqlServer.fs" />
+    <Compile Include="QueryTranslator.fs" />
     <None Include="paket.references" />
     <None Include="paket.template" />
   </ItemGroup>

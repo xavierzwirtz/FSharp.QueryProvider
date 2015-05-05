@@ -10,9 +10,12 @@ open FSharp.QueryProvider.QueryTranslatorUtilities
 open FSharp.QueryProvider.DataReader
 open FSharp.QueryProvider.PreparedQuery
 
-module SqlServer =
+module QueryTranslator =
 
-    let defaultGetDBType (morP : TypeSource) : SqlDbType DBType =
+    type QueryDialect = 
+    | SqlServer2012
+
+    let private defaultGetDBType (morP : TypeSource) : SqlDbType DBType =
         let t = 
             match morP with 
             | Method m -> m.ReturnType
@@ -30,13 +33,13 @@ module SqlServer =
         | System.TypeCode.Int64 -> DataType SqlDbType.BigInt
         | _t -> Unhandled
 
-    let defaultGetTableName (t:System.Type) : string =
+    let private defaultGetTableName (t:System.Type) : string =
         t.Name
-    let defaultGetColumnName (t:System.Reflection.MemberInfo) : string =
+    let private defaultGetColumnName (t:System.Reflection.MemberInfo) : string =
         t.Name
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
-    let createTypeConstructionInfo selectIndex (t : System.Type) returnType =
+    let private createTypeConstructionInfo selectIndex (t : System.Type) returnType =
         if isValueType t then
             {
                 ReturnType = returnType
@@ -74,7 +77,7 @@ module SqlServer =
                 failwithf "not implemented type '%s'" t.Name
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
-    let createTypeSelect 
+    let private createTypeSelect 
         (getColumnName : System.Reflection.MemberInfo -> string) 
         (tableAlias : string list) 
         (topSelect : bool) 
@@ -103,6 +106,7 @@ module SqlServer =
             failwith "not implemented, only records are currently implemented"
 
     let translate 
+        (_queryDialect : QueryDialect)
         (getDBType : GetDBType<SqlDbType> option) 
         (getTableName : GetTableName option) 
         (getColumnName : GetColumnName option) 
@@ -468,8 +472,8 @@ module SqlServer =
             cmd.Parameters.Add(sqlParam) |> ignore
         cmd
 
-    let translateToCommand getDBType getTableName getColumnName connection expression =
-        let ps = translate getDBType getTableName getColumnName expression
+    let translateToCommand queryDialect getDBType getTableName getColumnName connection expression =
+        let ps = translate queryDialect getDBType getTableName getColumnName expression
 
         let cmd = createCommand connection ps
 
