@@ -71,7 +71,7 @@ module SqlServer =
                     PropertySets = []
                 }
             else
-                failwith "not implemented type '%s'" t.Name
+                failwithf "not implemented type '%s'" t.Name
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
     let createTypeSelect 
