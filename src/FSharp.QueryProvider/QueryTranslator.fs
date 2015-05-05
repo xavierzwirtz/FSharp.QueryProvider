@@ -1,4 +1,4 @@
-﻿namespace FSharp.QueryProvider.Engines
+﻿namespace FSharp.QueryProvider
 
 type SqlDbType = System.Data.SqlDbType
 
