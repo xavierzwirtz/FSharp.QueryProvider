@@ -15,6 +15,10 @@ module QueryTranslator =
     type QueryDialect = 
     | SqlServer2012
 
+    type QueryType =
+    | SelectQuery
+    | DeleteQuery
+
     let private defaultGetDBType (morP : TypeSource) : SqlDbType DBType =
         let t = 
             match morP with 
@@ -80,7 +84,7 @@ module QueryTranslator =
     let private createTypeSelect 
         (getColumnName : System.Reflection.MemberInfo -> string) 
         (tableAlias : string list) 
-        (topSelect : bool) 
+        (topQuery : bool) 
         (returnType : ReturnType)
         (t : System.Type) =
         // need to call a function here so that this can be extended
@@ -96,7 +100,7 @@ module QueryTranslator =
             let query = query @ [" "]
 
             let ctor = 
-                if topSelect then
+                if topQuery then
                     Some (createTypeConstructionInfo 0 t returnType)
                 else
                     None
@@ -107,6 +111,7 @@ module QueryTranslator =
 
     let translate 
         (_queryDialect : QueryDialect)
+        (queryType : QueryType)
         (getDBType : GetDBType<SqlDbType> option) 
         (getTableName : GetTableName option) 
         (getColumnName : GetColumnName option) 
@@ -166,7 +171,7 @@ module QueryTranslator =
                 createNull (getColumnNameIndex()) dbType
 
             let createTypeSelect tableAlias returnType t = 
-                let q, ctorOption = createTypeSelect getColumnName tableAlias context.TopSelect returnType t
+                let q, ctorOption = createTypeSelect getColumnName tableAlias context.TopQuery returnType t
                 let c = 
                     match ctorOption with
                     | None -> []
@@ -230,7 +235,7 @@ module QueryTranslator =
 
                         let tableAlias = (getTableAlias())
                         let map e = 
-                            mapd {TableAlias = Some tableAlias; TopSelect = false} e
+                            mapd {TableAlias = Some tableAlias; TopQuery = false} e
                         let createTypeSelect t = 
                             let returnType = 
                                 let isSome l = l |> List.exists(fun (m : option<_>)-> m.IsSome)
@@ -242,55 +247,59 @@ module QueryTranslator =
                                     Many
                             createTypeSelect tableAlias returnType t
 
-                        let selectColumn, selectParameters, selectCtor = 
-                            match count with
-                            | Some _-> 
-                                ["COUNT(*) "], [], [createTypeConstructionInfo 0 typedefof<int> Single]
-                            | None -> 
-                                if contains.IsSome || any.IsSome then
-                                    ["CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END "], [] , [createTypeConstructionInfo 0 typedefof<bool> Single]
-                                else
-                                    let partialSelect (l : LambdaExpression) =
-                                        let t = l.ReturnType
-                                        let c = 
-                                            if context.TopSelect then
-                                                [createTypeConstructionInfo 0 t Many]
-                                            else
-                                                []
-                                        let q, p, _ = (l.Body |> map) 
-                                        q @ [" "], p, c
-                                    match maxOrMin with 
-                                    | Some m ->
-                                        partialSelect (getLambda m)
+                        let selectOrDelete, selectParameters, selectCtor =
+                            if context.TopQuery && queryType = DeleteQuery then
+                                ["DELETE "], [], []
+                            else
+                                let selectColumn, selectParameters, selectCtor = 
+                                    match count with
+                                    | Some _-> 
+                                        ["COUNT(*) "], [], [createTypeConstructionInfo 0 typedefof<int> Single]
                                     | None -> 
-                                        match select with
-                                        | Some s->
-                                            match getLambda(s) with
-                                            | SingleSameSelect x -> 
-                                                createTypeSelect x.Type
-                                            | l ->
-                                                partialSelect l
-                                        | None -> 
-                                            createTypeSelect (Queryable.TypeSystem.getElementType (queryable.GetType()))
-                        let topStatement = 
-                            let count = 
-                                if single.IsSome || singleOrDefault.IsSome then
-                                    Some 2
-                                else if 
-                                    first.IsSome ||
-                                    firstOrDefault.IsSome ||
-                                    max.IsSome || 
-                                    min.IsSome then
-                                    Some 1
-                                else
-                                    None
+                                        if contains.IsSome || any.IsSome then
+                                            ["CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END "], [] , [createTypeConstructionInfo 0 typedefof<bool> Single]
+                                        else
+                                            let partialSelect (l : LambdaExpression) =
+                                                let t = l.ReturnType
+                                                let c = 
+                                                    if context.TopQuery then
+                                                        [createTypeConstructionInfo 0 t Many]
+                                                    else
+                                                        []
+                                                let q, p, _ = (l.Body |> map) 
+                                                q @ [" "], p, c
+                                            match maxOrMin with 
+                                            | Some m ->
+                                                partialSelect (getLambda m)
+                                            | None -> 
+                                                match select with
+                                                | Some s->
+                                                    match getLambda(s) with
+                                                    | SingleSameSelect x -> 
+                                                        createTypeSelect x.Type
+                                                    | l ->
+                                                        partialSelect l
+                                                | None -> 
+                                                    createTypeSelect (Queryable.TypeSystem.getElementType (queryable.GetType()))
+                                let topStatement = 
+                                    let count = 
+                                        if single.IsSome || singleOrDefault.IsSome then
+                                            Some 2
+                                        else if 
+                                            first.IsSome ||
+                                            firstOrDefault.IsSome ||
+                                            max.IsSome || 
+                                            min.IsSome then
+                                            Some 1
+                                        else
+                                            None
 
-                            match count with
-                            | Some i -> ["TOP "; i.ToString(); " "]
-                            | None -> []
+                                    match count with
+                                    | Some i -> ["TOP "; i.ToString(); " "]
+                                    | None -> []
+                                ["SELECT " ] @ topStatement @ selectColumn, selectParameters, selectCtor
 
-                        let selectStatement =
-                            ["SELECT " ] @ topStatement @ selectColumn @ ["FROM "; getTableName(queryable.ElementType); " AS "; ] @ tableAlias
+                        let mainStatement = selectOrDelete @ ["FROM "; getTableName(queryable.ElementType); " AS "; ] @ tableAlias
 
                         let whereClause, whereParameters, whereCtor =
                             let fromWhere = 
@@ -366,7 +375,7 @@ module QueryTranslator =
 
                                 [" ORDER BY "] @ colSorts, parameters, ctor
 
-                        let sql = selectStatement @ whereClause @ orderByClause
+                        let sql = mainStatement @ whereClause @ orderByClause
                         let parameters = orderByParameters @ whereParameters @ selectParameters
                         let ctor = orderByCtor @ whereCtor @ selectCtor
                         Some (sql, parameters, ctor)
@@ -447,7 +456,7 @@ module QueryTranslator =
 
         let results = 
             expression
-            |> mapd(mapFun) ({TableAlias = None; TopSelect = true})
+            |> mapd(mapFun) ({TableAlias = None; TopQuery = true})
 
         let queryList, queryParameters, resultConstructionInfo = results |> splitResults
 
@@ -457,7 +466,11 @@ module QueryTranslator =
             PreparedStatement.Text = query
             FormattedText = query
             Parameters = queryParameters
-            ResultConstructionInfo = resultConstructionInfo |> Seq.exactlyOne
+            ResultConstructionInfo = 
+                if resultConstructionInfo |> Seq.isEmpty then
+                    None
+                else
+                    Some (resultConstructionInfo |> Seq.exactlyOne)
         }
 
     let createCommand (connection : System.Data.SqlClient.SqlConnection) (preparedStatement : PreparedStatement<SqlDbType>) =
@@ -472,8 +485,8 @@ module QueryTranslator =
             cmd.Parameters.Add(sqlParam) |> ignore
         cmd
 
-    let translateToCommand queryDialect getDBType getTableName getColumnName connection expression =
-        let ps = translate queryDialect getDBType getTableName getColumnName expression
+    let translateToCommand queryDialect queryType getDBType getTableName getColumnName connection expression =
+        let ps = translate queryType queryDialect getDBType getTableName getColumnName expression
 
         let cmd = createCommand connection ps
 

@@ -60,17 +60,29 @@ let AreEqualTranslateExpression (translate : Expression -> PreparedStatement<_>)
     let ctorEqual =
         let e = expectedResultConstructionInfo
         let a = sqlQuery.ResultConstructionInfo
-        e.ReturnType = a.ReturnType &&
-        e.Type = a.Type &&
-        compareSeq e.PropertySets a.PropertySets &&
-        compareSeq e.ConstructorArgs a.ConstructorArgs
+        match a with
+        | None -> false
+        | Some a -> 
+            e.ReturnType = a.ReturnType &&
+            e.Type = a.Type &&
+            compareSeq e.PropertySets a.PropertySets &&
+            compareSeq e.ConstructorArgs a.ConstructorArgs
          
     if not ctorEqual then
         Assert.Fail(sprintf "Expected: \n%A \n\nActual: \n%A" (expectedResultConstructionInfo) (sqlQuery.ResultConstructionInfo))
 
     printfn "%s" (sqlQuery.FormattedText)
 
-let AreEqualExpression get = AreEqualTranslateExpression (QueryTranslator.translate QueryTranslator.SqlServer2012 None None None) get
+let AreEqualExpression get = AreEqualTranslateExpression (QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.SelectQuery None None None) get
+
+let AreEqualDeleteOrSelectExpression get select expectedSql (expectedParameters: list<PreparedParameter<_>>) (expectedResultConstructionInfo) : unit =
+    AreEqualExpression get (select + expectedSql) expectedParameters expectedResultConstructionInfo
+    let expression = getExpression get
+    let deleteQuery = (QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.DeleteQuery None None None) expression
+    Assert.AreEqual("DELETE " + expectedSql, deleteQuery.Text)
+    Assert.AreEqual(None, deleteQuery.ResultConstructionInfo)
+    areSeqEqual deleteQuery.Parameters (expectedParameters |> List.toSeq)
+
 //use for test data:
 //http://fsprojects.github.io/FSharp.Linq.ComposableQuery/QueryExamples.html
 //https://msdn.microsoft.com/en-us/library/vstudio/hh225374.aspx
@@ -156,7 +168,7 @@ module QueryGenTest =
             }
         
         let translate = 
-            QueryTranslator.translate QueryTranslator.SqlServer2012 None None (Some (fun m ->
+            QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.SelectQuery None None (Some (fun m ->
                 if m.Name = "PersonName" then
                     Some (m.Name + "Mod")
                 else
@@ -182,7 +194,7 @@ module QueryGenTest =
             }
         
         let translate = 
-            QueryTranslator.translate QueryTranslator.SqlServer2012 None (Some (fun t ->
+            QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.SelectQuery None (Some (fun t ->
                 if t.Name = "Person" then
                     Some (t.Name + "Mod")
                 else
@@ -203,7 +215,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1)" [
             {Name="@p1"; Value=(!name); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
@@ -218,7 +230,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1)" [
             {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
@@ -234,7 +246,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1)" [
             {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
@@ -251,7 +263,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1)" [
             {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
@@ -266,7 +278,7 @@ module QueryGenTest =
                     select p
                 }
         
-            AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+            AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1)" [
                 {Name="@p1"; Value=gen(); DbType = System.Data.SqlDbType.NVarChar}
             ] (personSelect(0))
 
@@ -283,7 +295,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1 AND T.PersonId = @p2)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1 AND T.PersonId = @p2)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
             {Name="@p2"; Value=5; DbType = System.Data.SqlDbType.Int}
         ] (personSelect 0)
@@ -297,7 +309,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1 OR T.PersonName = @p2)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1 OR T.PersonName = @p2)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
             {Name="@p2"; Value="doe"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
@@ -311,7 +323,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1 OR T.PersonName = @p2 OR T.PersonName = @p3)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1 OR T.PersonName = @p2 OR T.PersonName = @p3)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
             {Name="@p2"; Value="doe"; DbType = System.Data.SqlDbType.NVarChar}
             {Name="@p3"; Value="james"; DbType = System.Data.SqlDbType.NVarChar}
@@ -326,7 +338,7 @@ module QueryGenTest =
                 select e
             }
         
-        AreEqualExpression q "SELECT T.EmployeeId, T.EmployeeName, T.DepartmentId, T.VersionNo, T.PersonId FROM Employee AS T WHERE (T.DepartmentId = @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.EmployeeId, T.EmployeeName, T.DepartmentId, T.VersionNo, T.PersonId " "FROM Employee AS T WHERE (T.DepartmentId = @p1)" [
             {Name="@p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
         ] (employeeSelect 0)
     [<Test>]
@@ -338,7 +350,7 @@ module QueryGenTest =
                 select e
             }
         
-        AreEqualExpression q "SELECT T.EmployeeId, T.EmployeeName, T.DepartmentId, T.VersionNo, T.PersonId FROM Employee AS T WHERE (T.DepartmentId = @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.EmployeeId, T.EmployeeName, T.DepartmentId, T.VersionNo, T.PersonId " "FROM Employee AS T WHERE (T.DepartmentId = @p1)" [
             {Name="@p1"; Value=System.DBNull.Value; DbType = System.Data.SqlDbType.Int}
         ] (employeeSelect 0)
 
@@ -351,7 +363,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName LIKE '%' + @p1 + '%')" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName LIKE '%' + @p1 + '%')" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
@@ -364,7 +376,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName LIKE @p1 + '%')" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName LIKE @p1 + '%')" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
@@ -377,7 +389,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName LIKE '%' + @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName LIKE '%' + @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
@@ -394,7 +406,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2))" [] (personSelect 0)
+        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2))" [] (personSelect 0)
 
     [<Test>]
     let ``where subquery with where contains id ``() =
@@ -410,7 +422,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2 WHERE (T2.DepartmentId = @p1)))" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2 WHERE (T2.DepartmentId = @p1)))" [
             {Name="@p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
         ] (personSelect 0)
 
@@ -430,7 +442,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2 WHERE (T2.DepartmentId = @p1)))" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2 WHERE (T2.DepartmentId = @p1)))" [
             {Name="@p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
         ] (personSelect(0))
 
@@ -577,7 +589,7 @@ module QueryGenTest =
         
         let e = getExpression q
         let exc = Assert.Throws(fun () -> 
-            QueryTranslator.translate QueryTranslator.SqlServer2012 None None None e |> ignore)
+            QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.SelectQuery None None None e |> ignore)
         Assert.AreEqual(exc.Message, "'last' operator has no translations for Sql Server")
 
     [<Test>]
@@ -590,7 +602,7 @@ module QueryGenTest =
         
         let e = getExpression q
         let exc = Assert.Throws(fun () -> 
-            QueryTranslator.translate QueryTranslator.SqlServer2012 None None None e |> ignore)
+            QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.SelectQuery None None None e |> ignore)
         Assert.AreEqual(exc.Message, "'lastOrDefault' operator has no translations for Sql Server")
 
     [<Test>]

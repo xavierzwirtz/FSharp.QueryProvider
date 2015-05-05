@@ -22,7 +22,7 @@ module List =
 
 type Context = {
     TableAlias : string list option
-    TopSelect : bool
+    TopQuery : bool
 }
 
 type DBType<'t>= 
