@@ -30,7 +30,7 @@ type OptionName = {
 }
 
 let ctorOneSimple t = 
-    {
+    ConstructionInfo.Type {
         ReturnType = Single
         Type = t
         ConstructorArgs = [Value 0]
@@ -38,7 +38,7 @@ let ctorOneSimple t =
     }
 
 let ctorManySimple t = 
-    {
+    ConstructionInfo.Type {
         ReturnType = Many
         Type = t
         ConstructorArgs = [Value 0]
@@ -46,7 +46,7 @@ let ctorManySimple t =
     }
 
 let ctorName returnType =
-    {
+    ConstructionInfo.Type {
         ReturnType = returnType
         Type = typedefof<Name>
         ConstructorArgs = [Value 0]
@@ -59,13 +59,13 @@ let ctorOptionName returnType =
     ] []
 
 let ctorVerboseRecord returnType = 
-    {
+    ConstructionInfo.Type {
         ReturnType = returnType
         Type = typedefof<VerboseRecord>
         ConstructorArgs = [0..11] |> Seq.map(fun i -> Value i)
         PropertySets = []
     }
-    
+
 [<Test>]
 let ``one string``() =
     let reader = new LocalDataReader([["foo bar"]])
@@ -321,7 +321,7 @@ let ``option some``() =
     let reader = 
         new LocalDataReader([["first"]])
 
-    let result = (read reader (ctorOptionName Single)) :?> OptionName
+    let result = (read reader (ConstructionInfo.Type (ctorOptionName Single))) :?> OptionName
 
     Assert.AreEqual({OptionValue = Some "first"}, result)
 
@@ -331,6 +331,82 @@ let ``option none``() =
     let reader = 
         new LocalDataReader([[null]])
 
-    let result = (read reader (ctorOptionName Single)) :?> OptionName
+    let result = (read reader (ConstructionInfo.Type (ctorOptionName Single))) :?> OptionName
 
     Assert.AreEqual({OptionValue = None}, result)
+
+open System.Linq.Expressions
+
+let toLambda quote = 
+    let raw = Microsoft.FSharp.Linq.RuntimeHelpers.LeafExpressionConverter.QuotationToExpression quote
+    let methodCall = raw :?> MethodCallExpression
+    methodCall.Arguments.Item(0) :?> LambdaExpression
+
+[<Test>]
+let ``lambda int add``() =
+
+    let reader = 
+        new LocalDataReader([[5; 2]])
+
+    let p1 = Expression.Parameter(typedefof<int>)
+    let p2 = Expression.Parameter(typedefof<int>)
+    let lambda = Expression.Lambda(Expression.Add(p1, p2), [p1; p2])
+
+    let ctor = 
+        ConstructionInfo.Lambda (
+            {
+                LambdaConstructionInfo.Lambda = lambda
+                LambdaConstructionInfo.Parameters = [Value 0; Value 1]
+                LambdaConstructionInfo.ReturnType = Single
+                LambdaConstructionInfo.Type = typedefof<int>
+            }
+        )
+    let result = (read reader ctor) :?> int
+
+    Assert.AreEqual(7, result)
+
+[<Test>]
+let ``lambda string mod``() =
+
+    let reader = 
+        new LocalDataReader([["foo"]])
+
+    let lambda = toLambda <@ fun f -> f + "bar"@> 
+//    let body = Expression.Call(null, String.con)
+//    let lambda = Expression.Lambda(body, [p])
+
+    let ctor = 
+        ConstructionInfo.Lambda (
+            {
+                LambdaConstructionInfo.Lambda = lambda
+                LambdaConstructionInfo.Parameters = [Value 0]
+                LambdaConstructionInfo.ReturnType = Single
+                LambdaConstructionInfo.Type = typedefof<string>
+            }
+        )
+    let result = (read reader ctor) :?> string
+
+    Assert.AreEqual("foobar", result)
+
+[<Test>]
+let ``lambda type mod``() =
+
+    let reader = 
+        new LocalDataReader([["foo"]])
+
+    let lambda = toLambda <@ fun ( opt : OptionName )  -> opt.OptionValue.Value + "bar"@> 
+//    let body = Expression.Call(null, String.con)
+//    let lambda = Expression.Lambda(body, [p])
+
+    let ctor = 
+        ConstructionInfo.Lambda (
+            {
+                LambdaConstructionInfo.Lambda = lambda
+                LambdaConstructionInfo.Parameters = [Type (ctorOptionName Single)]
+                LambdaConstructionInfo.ReturnType = Single
+                LambdaConstructionInfo.Type = typedefof<string>
+            }
+        )
+    let result = (read reader ctor) :?> string
+
+    Assert.AreEqual("foobar", result)

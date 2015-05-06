@@ -9,15 +9,26 @@ type ReturnType =
 | Many
 // | Group of GroupExpression
 
-type ValueOrTypeConstructionInfo = 
+type ConstructionInfo = 
+| Type of TypeConstructionInfo
+| Lambda of LambdaConstructionInfo
+
+and TypeOrValueConstructionInfo = 
 | Type of TypeConstructionInfo
 | Value of int
 
 and TypeConstructionInfo = {
     Type : System.Type
     ReturnType : ReturnType
-    ConstructorArgs : ValueOrTypeConstructionInfo seq
-    PropertySets : (ValueOrTypeConstructionInfo * System.Reflection.PropertyInfo) seq
+    ConstructorArgs : TypeOrValueConstructionInfo seq
+    PropertySets : (TypeOrValueConstructionInfo * System.Reflection.PropertyInfo) seq
+}
+
+and LambdaConstructionInfo = {
+    Type : System.Type
+    ReturnType : ReturnType
+    Lambda : System.Linq.Expressions.LambdaExpression
+    Parameters : TypeOrValueConstructionInfo seq
 }
 
 let createTypeConstructionInfo t returnType constructorArgs propertySets =
@@ -34,8 +45,22 @@ let isOption (t : System.Type) =
     t.IsGenericType &&
     t.GetGenericTypeDefinition() = typedefof<Option<_>>
 
-let rec constructResult (reader : System.Data.IDataReader) (typeCtor : TypeConstructionInfo) : obj =
+let rec constructResult (reader : System.Data.IDataReader) (ctor : ConstructionInfo) : obj =
     
+    match ctor with
+    | ConstructionInfo.Lambda l ->  
+        let paramValues = 
+            l.Parameters 
+            |> Seq.map(fun p -> 
+                match p with
+                | Type typeCtor -> constructType reader typeCtor
+                | Value i -> reader.GetValue i
+            )
+        l.Lambda.Compile().DynamicInvoke(paramValues |> Seq.toArray)
+    | ConstructionInfo.Type typeCtor ->
+        constructType reader typeCtor
+
+and constructType reader typeCtor = 
     let getSingleIndex() = 
         match typeCtor.ConstructorArgs |> Seq.exactlyOne with
         | Type _ -> failwith "Shouldnt be Type"
@@ -78,7 +103,7 @@ let rec constructResult (reader : System.Data.IDataReader) (typeCtor : TypeConst
             typeCtor.ConstructorArgs
             |> Seq.map(fun arg -> 
                 match arg with 
-                | Type t -> constructResult reader t
+                | Type t -> constructType reader t
                 | Value i -> reader.GetValue i
             )
 
@@ -93,14 +118,19 @@ let rec constructResult (reader : System.Data.IDataReader) (typeCtor : TypeConst
         
         inst
 
-let read (reader : System.Data.IDataReader) (typeCtor : TypeConstructionInfo) : obj = 
+let read (reader : System.Data.IDataReader) constructionInfo : obj = 
     let constructResult () = 
-        constructResult reader typeCtor
+        constructResult reader constructionInfo
          
-    match typeCtor.ReturnType with
+    let returnType, t = 
+        match constructionInfo with
+        | ConstructionInfo.Lambda l -> l.ReturnType, l.Type
+        | ConstructionInfo.Type t -> t.ReturnType, t.Type
+
+    match returnType with
     | Many -> 
         let listT = typedefof<System.Collections.Generic.List<_>>
-        let conListT = listT.MakeGenericType([| typeCtor.Type |])
+        let conListT = listT.MakeGenericType([| t |])
         let addM = conListT.GetMethods() |> Seq.find(fun m -> m.Name = "Add")
         let inst = System.Activator.CreateInstance(conListT)
         while reader.Read() do
@@ -114,11 +144,11 @@ let read (reader : System.Data.IDataReader) (typeCtor : TypeConstructionInfo) : 
                 raise (System.InvalidOperationException "Sequence contains more than one element")
             r
         else
-            match typeCtor.ReturnType with
+            match returnType with
             | Single -> raise (System.InvalidOperationException "Sequence contains no elements")
             | SingleOrDefault -> 
-                if isValueType typeCtor.Type then
-                    System.Activator.CreateInstance(typeCtor.Type)
+                if isValueType t then
+                    System.Activator.CreateInstance(t)
                 else
                     null
             | _ -> failwith "shouldnt be here"
