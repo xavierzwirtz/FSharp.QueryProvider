@@ -9,7 +9,13 @@ type ReturnType =
 | Many
 // | Group of GroupExpression
 
-type ConstructionInfo = 
+type ConstructionInfo = {
+    ReturnType : ReturnType
+    Type : System.Type
+    TypeOrLambda : TypeOrLambdaConstructionInfo
+}
+
+and TypeOrLambdaConstructionInfo = 
 | Type of TypeConstructionInfo
 | Lambda of LambdaConstructionInfo
 
@@ -19,22 +25,18 @@ and TypeOrValueConstructionInfo =
 
 and TypeConstructionInfo = {
     Type : System.Type
-    ReturnType : ReturnType
     ConstructorArgs : TypeOrValueConstructionInfo seq
     PropertySets : (TypeOrValueConstructionInfo * System.Reflection.PropertyInfo) seq
 }
 
 and LambdaConstructionInfo = {
-    Type : System.Type
-    ReturnType : ReturnType
     Lambda : System.Linq.Expressions.LambdaExpression
     Parameters : TypeOrValueConstructionInfo seq
 }
 
-let createTypeConstructionInfo t returnType constructorArgs propertySets =
+let createTypeConstructionInfo t constructorArgs propertySets =
     {
         Type = t
-        ReturnType = returnType
         ConstructorArgs = constructorArgs
         PropertySets = propertySets
     }
@@ -47,8 +49,8 @@ let isOption (t : System.Type) =
 
 let rec constructResult (reader : System.Data.IDataReader) (ctor : ConstructionInfo) : obj =
     
-    match ctor with
-    | ConstructionInfo.Lambda l ->  
+    match ctor.TypeOrLambda with
+    | TypeOrLambdaConstructionInfo.Lambda l ->  
         let paramValues = 
             l.Parameters 
             |> Seq.map(fun p -> 
@@ -57,7 +59,7 @@ let rec constructResult (reader : System.Data.IDataReader) (ctor : ConstructionI
                 | Value i -> reader.GetValue i
             )
         l.Lambda.Compile().DynamicInvoke(paramValues |> Seq.toArray)
-    | ConstructionInfo.Type typeCtor ->
+    | TypeOrLambdaConstructionInfo.Type typeCtor ->
         constructType reader typeCtor
 
 and constructType reader typeCtor = 
@@ -122,11 +124,9 @@ let read (reader : System.Data.IDataReader) constructionInfo : obj =
     let constructResult () = 
         constructResult reader constructionInfo
          
-    let returnType, t = 
-        match constructionInfo with
-        | ConstructionInfo.Lambda l -> l.ReturnType, l.Type
-        | ConstructionInfo.Type t -> t.ReturnType, t.Type
-
+    let returnType = constructionInfo.ReturnType
+    let t = constructionInfo.Type
+    
     match returnType with
     | Many -> 
         let listT = typedefof<System.Collections.Generic.List<_>>

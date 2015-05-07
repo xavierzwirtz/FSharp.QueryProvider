@@ -30,40 +30,59 @@ type OptionName = {
 }
 
 let ctorOneSimple t = 
-    ConstructionInfo.Type {
+    {
         ReturnType = Single
         Type = t
-        ConstructorArgs = [Value 0]
-        PropertySets = []
+        TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
+            Type = t
+            ConstructorArgs = [Value 0]
+            PropertySets = []
+        }
     }
 
 let ctorManySimple t = 
-    ConstructionInfo.Type {
+    {
         ReturnType = Many
         Type = t
-        ConstructorArgs = [Value 0]
-        PropertySets = []
+        TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
+            Type = t
+            ConstructorArgs = [Value 0]
+            PropertySets = []
+        }
     }
 
 let ctorName returnType =
-    ConstructionInfo.Type {
+    {
         ReturnType = returnType
         Type = typedefof<Name>
-        ConstructorArgs = [Value 0]
-        PropertySets = []
+        TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
+            Type = typedefof<Name>
+            ConstructorArgs = [Value 0]
+            PropertySets = []
+        }
     }
 
-let ctorOptionName returnType =
-    createTypeConstructionInfo typedefof<OptionName> returnType [
-        Type (createTypeConstructionInfo (Some("").GetType()) returnType [Value 0] [])
+let ctorOptionName =
+    createTypeConstructionInfo typedefof<OptionName> [
+        Type (createTypeConstructionInfo (Some("").GetType()) [Value 0] [])
     ] []
 
+let ctorOptionNameFull returnType =
+    {
+        ReturnType = returnType
+        Type = typedefof<OptionName>
+        TypeOrLambda = TypeOrLambdaConstructionInfo.Type ctorOptionName
+    }
+
 let ctorVerboseRecord returnType = 
-    ConstructionInfo.Type {
+    {
         ReturnType = returnType
         Type = typedefof<VerboseRecord>
-        ConstructorArgs = [0..11] |> Seq.map(fun i -> Value i)
-        PropertySets = []
+        TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
+            Type = typedefof<VerboseRecord>
+            ConstructorArgs = [0..11] |> Seq.map(fun i -> Value i)
+            PropertySets = []
+        }
     }
 
 [<Test>]
@@ -321,7 +340,7 @@ let ``option some``() =
     let reader = 
         new LocalDataReader([["first"]])
 
-    let result = (read reader (ConstructionInfo.Type (ctorOptionName Single))) :?> OptionName
+    let result = (read reader (ctorOptionNameFull Single)) :?> OptionName
 
     Assert.AreEqual({OptionValue = Some "first"}, result)
 
@@ -331,16 +350,11 @@ let ``option none``() =
     let reader = 
         new LocalDataReader([[null]])
 
-    let result = (read reader (ConstructionInfo.Type (ctorOptionName Single))) :?> OptionName
+    let result = (read reader (ctorOptionNameFull Single)) :?> OptionName
 
     Assert.AreEqual({OptionValue = None}, result)
 
 open System.Linq.Expressions
-
-let toLambda quote = 
-    let raw = Microsoft.FSharp.Linq.RuntimeHelpers.LeafExpressionConverter.QuotationToExpression quote
-    let methodCall = raw :?> MethodCallExpression
-    methodCall.Arguments.Item(0) :?> LambdaExpression
 
 [<Test>]
 let ``lambda int add``() =
@@ -353,14 +367,15 @@ let ``lambda int add``() =
     let lambda = Expression.Lambda(Expression.Add(p1, p2), [p1; p2])
 
     let ctor = 
-        ConstructionInfo.Lambda (
-            {
-                LambdaConstructionInfo.Lambda = lambda
-                LambdaConstructionInfo.Parameters = [Value 0; Value 1]
-                LambdaConstructionInfo.ReturnType = Single
-                LambdaConstructionInfo.Type = typedefof<int>
+        {
+            ReturnType = Single
+            Type = typedefof<int>
+            TypeOrLambda = Lambda {
+                Lambda = lambda
+                Parameters = [Value 0; Value 1]
             }
-        )
+        }
+        
     let result = (read reader ctor) :?> int
 
     Assert.AreEqual(7, result)
@@ -376,14 +391,15 @@ let ``lambda string mod``() =
 //    let lambda = Expression.Lambda(body, [p])
 
     let ctor = 
-        ConstructionInfo.Lambda (
-            {
-                LambdaConstructionInfo.Lambda = lambda
-                LambdaConstructionInfo.Parameters = [Value 0]
-                LambdaConstructionInfo.ReturnType = Single
-                LambdaConstructionInfo.Type = typedefof<string>
+        {
+            ReturnType = Single
+            Type = typedefof<string>
+            TypeOrLambda = Lambda {
+                Lambda = lambda
+                Parameters = [Value 0]
             }
-        )
+        }
+
     let result = (read reader ctor) :?> string
 
     Assert.AreEqual("foobar", result)
@@ -399,14 +415,15 @@ let ``lambda type mod``() =
 //    let lambda = Expression.Lambda(body, [p])
 
     let ctor = 
-        ConstructionInfo.Lambda (
-            {
-                LambdaConstructionInfo.Lambda = lambda
-                LambdaConstructionInfo.Parameters = [Type (ctorOptionName Single)]
-                LambdaConstructionInfo.ReturnType = Single
-                LambdaConstructionInfo.Type = typedefof<string>
+        {
+            ReturnType = Single
+            Type = typedefof<string>
+            TypeOrLambda = Lambda {
+                Lambda = lambda
+                Parameters = [Type (ctorOptionName)]
             }
-        )
+        }
+
     let result = (read reader ctor) :?> string
 
     Assert.AreEqual("foobar", result)
