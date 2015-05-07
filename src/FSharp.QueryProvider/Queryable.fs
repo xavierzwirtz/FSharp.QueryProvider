@@ -116,7 +116,7 @@ and [<AbstractClass>] QueryProvider() =
 type DBQueryProvider<'T when 'T :> System.Data.IDbConnection>
     (
     getConnection : unit -> 'T, 
-    translate : 'T -> Expression -> System.Data.IDbCommand * DataReader.TypeConstructionInfo,
+    translate : 'T -> Expression -> System.Data.IDbCommand * DataReader.ConstructionInfo,
     onExecutingCommand : option<System.Data.IDbCommand -> System.Data.IDbCommand * obj>,
     onExecutedCommand : option<System.Data.IDbCommand * obj -> unit>
     ) =

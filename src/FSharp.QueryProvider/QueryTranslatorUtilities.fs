@@ -107,7 +107,7 @@ let createParameter columnIndex value dbType =
         DbType = dbType
     }
 
-    [p.Name; ""], [p], List.empty<TypeConstructionInfo>
+    [p.Name; ""], [p], List.empty<ConstructionInfo>
 
 let rec unwrapValue value = 
     let t = value.GetType()

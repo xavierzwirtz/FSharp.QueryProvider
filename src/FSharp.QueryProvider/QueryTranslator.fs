@@ -43,10 +43,9 @@ module QueryTranslator =
         t.Name
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
-    let private createTypeConstructionInfo selectIndex (t : System.Type) returnType =
+    let private createTypeConstructionInfo selectIndex (t : System.Type) : TypeConstructionInfo =
         if isValueType t then
             {
-                ReturnType = returnType
                 Type = t
                 ConstructorArgs = [Value selectIndex] 
                 PropertySets = []
@@ -62,30 +61,36 @@ module QueryTranslator =
                         Value selectIndex
                     else if isOption t then
                         Type {
-                            ReturnType = Single
                             Type = t
                             ConstructorArgs = [Value selectIndex] 
                             PropertySets = []
-                        }            
+                        }
                     else
                         failwith "non value type not supported"
                 )
-
+                
                 {
-                    ReturnType = returnType
                     Type = t
                     ConstructorArgs = ctorArgs
                     PropertySets = []
                 }
+                
             else
                 failwithf "not implemented type '%s'" t.Name
+
+    let private createConstructionInfoForType selectIndex (t : System.Type) returnType : ConstructionInfo =
+        let typeCtor = createTypeConstructionInfo selectIndex t 
+        {
+            ReturnType = returnType
+            Type = typeCtor.Type
+            TypeOrLambda = TypeOrLambdaConstructionInfo.Type typeCtor
+        }
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
     let private createTypeSelect 
         (getColumnName : System.Reflection.MemberInfo -> string) 
         (tableAlias : string list) 
         (topQuery : bool) 
-        (returnType : ReturnType)
         (t : System.Type) =
         // need to call a function here so that this can be extended
         if Microsoft.FSharp.Reflection.FSharpType.IsRecord t then
@@ -101,7 +106,13 @@ module QueryTranslator =
 
             let ctor = 
                 if topQuery then
-                    Some (createTypeConstructionInfo 0 t returnType)
+                    Some (createTypeConstructionInfo 0 t)
+//                    let typeCtor = createTypeConstructionInfo 0 t
+//                    Some {
+//                        ReturnType = returnType
+//                        Type = typeCtor.Type
+//                        TypeOrLambda = TypeOrLambdaConstructionInfo.Type typeCtor
+//                    }
                 else
                     None
 
@@ -159,7 +170,7 @@ module QueryTranslator =
             tableAliasIndex := (!tableAliasIndex + 1)
             a
         
-        let rec mapFun (context : Context) e : ExpressionResult * (string list * PreparedParameter<_> list * TypeConstructionInfo list) = 
+        let rec mapFun (context : Context) e : ExpressionResult * (string list * PreparedParameter<_> list * ConstructionInfo list) = 
             let mapd = fun context e ->
                 mapd(mapFun) context e |> splitResults
             let map = fun e ->
@@ -170,20 +181,12 @@ module QueryTranslator =
             let createNull dbType = 
                 createNull (getColumnNameIndex()) dbType
 
-            let createTypeSelect tableAlias returnType t = 
-                let q, ctorOption = createTypeSelect getColumnName tableAlias context.TopQuery returnType t
-                let c = 
-                    match ctorOption with
-                    | None -> []
-                    | Some c -> [c]
-                q, [], c
-
             let bin (e : BinaryExpression) (text : string) = 
                 let leftSql, leftParams, leftCtor = map(e.Left)
                 let rightSql, rightParams, rightCtor = map(e.Right)
                 Some (leftSql @ [" "; text; " "] @ rightSql, leftParams @ rightParams, leftCtor @ rightCtor)
 
-            let result : option<string list * PreparedParameter<_> list * TypeConstructionInfo list>= 
+            let result : option<string list * PreparedParameter<_> list * ConstructionInfo list>= 
                 match e with
                 | Call m -> 
                     let linqChain = getOperationsAndQueryable m
@@ -236,34 +239,48 @@ module QueryTranslator =
                         let tableAlias = (getTableAlias())
                         let map e = 
                             mapd {TableAlias = Some tableAlias; TopQuery = false} e
-                        let createTypeSelect t = 
-                            let returnType = 
-                                let isSome l = l |> List.exists(fun (m : option<_>)-> m.IsSome)
-                                if [single; first] |> isSome then
-                                    Single
-                                else if [singleOrDefault; firstOrDefault] |> isSome then
-                                    SingleOrDefault
-                                else
-                                    Many
-                            createTypeSelect tableAlias returnType t
 
+                        let getReturnType () =
+                            let isSome l = l |> List.exists(fun (m : option<_>)-> m.IsSome)
+                            if [single; first] |> isSome then
+                                Single
+                            else if [singleOrDefault; firstOrDefault] |> isSome then
+                                SingleOrDefault
+                            else
+                                Many
+
+                        let createTypeSelect t = 
+                            let q, ctor = createTypeSelect getColumnName tableAlias context.TopQuery t
+                            q, [], ctor
+                        let createFullTypeSelect t =
+                            let q, p, ctor = createTypeSelect t
+                            let ctor = 
+                                match ctor with
+                                | None -> []
+                                | Some ctor -> 
+                                    [{
+                                        ReturnType = (getReturnType())
+                                        Type = ctor.Type
+                                        TypeOrLambda = TypeOrLambdaConstructionInfo.Type ctor
+                                    }]
+                            q, p, ctor
                         let selectOrDelete, selectParameters, selectCtor =
                             if context.TopQuery && queryType = DeleteQuery then
-                                ["DELETE "], [], []
+                                ["DELETE " ] @ tableAlias @ [" "], [], []
                             else
                                 let selectColumn, selectParameters, selectCtor = 
                                     match count with
                                     | Some _-> 
-                                        ["COUNT(*) "], [], [createTypeConstructionInfo 0 typedefof<int> Single]
+                                        ["COUNT(*) "], [], [createConstructionInfoForType 0 typedefof<int> Single]
                                     | None -> 
                                         if contains.IsSome || any.IsSome then
-                                            ["CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END "], [] , [createTypeConstructionInfo 0 typedefof<bool> Single]
+                                            ["CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END "], [] , [createConstructionInfoForType 0 typedefof<bool> Single]
                                         else
                                             let partialSelect (l : LambdaExpression) =
                                                 let t = l.ReturnType
                                                 let c = 
                                                     if context.TopQuery then
-                                                        [createTypeConstructionInfo 0 t Many]
+                                                        [createConstructionInfoForType 0 t Many]
                                                     else
                                                         []
                                                 let q, p, _ = (l.Body |> map) 
@@ -273,14 +290,73 @@ module QueryTranslator =
                                                 partialSelect (getLambda m)
                                             | None -> 
                                                 match select with
-                                                | Some s->
-                                                    match getLambda(s) with
-                                                    | SingleSameSelect x -> 
-                                                        createTypeSelect x.Type
+                                                | Some select ->
+                                                    match getLambda(select) with
+                                                    | SingleSameSelect x -> createFullTypeSelect x.Type
                                                     | l ->
-                                                        partialSelect l
+                                                        match l.Body with
+                                                        | MemberAccess _ -> partialSelect l
+                                                        | Call _m  -> 
+                                                            if not context.TopQuery then
+                                                                failwith "Calls are only allowed in top select"
+                                                            if queryType = DeleteQuery then
+                                                                failwith "Calls are not allowed in DeleteQuery"
+                                                            let rec isParameter e = 
+                                                                match e with
+                                                                | Parameter _ -> true
+                                                                | MemberAccess m -> isParameter m.Expression
+                                                                | _ -> false
+                                                                
+//                                                            let queryArgs =
+//                                                                 m.Arguments 
+//                                                                 |> Seq.filter(isParameter)
+//
+//                                                            printfn "%A" queryArgs
+
+                                                            //let needsSelect = 
+//                                                                 |> Seq.map(fun m -> 
+//                                                                     let changed 
+//                                                                     m, m //changed
+//                                                                 )
+//                                                                 |> dict
+
+//                                                            let methodArgs = 
+//                                                                m.Arguments 
+//                                                                |> Seq.map(fun arg -> 
+//                                                                    if isParameter arg then
+//                                                                        arg
+//                                                                    else
+//                                                                        arg
+//                                                                )
+                                                           // let body = Expression.Call(m.Method, methodArgs)
+                                                            //let rewrittenExpression = Expression.Lambda(body, methodArgs)
+                                                            //printfn "%A" rewrittenExpression
+                                                            //take arguments, map to new argument sequence
+                                                            // check if the node type is parameter, transform it then
+                                                            // select all arguments where node type is parameter
+                                                            //failwith "not implemented call"
+                                                            let selectQuery, selectParams, typeCtor = 
+                                                                createTypeSelect (Queryable.TypeSystem.getElementType (queryable.GetType()))
+                                                            let typeCtor = 
+                                                                match typeCtor with
+                                                                | Some typeCtor -> typeCtor
+                                                                | None -> failwith "shouldnt be none"
+
+                                                            let lambdaCtor = {
+                                                                Lambda = l
+                                                                Parameters = [Type typeCtor]
+                                                            }
+
+                                                            let ctor = {
+                                                                Type = l.ReturnType
+                                                                ReturnType = getReturnType()
+                                                                TypeOrLambda = TypeOrLambdaConstructionInfo.Lambda lambdaCtor
+                                                            }
+
+                                                            selectQuery, selectParams, [ctor]
+                                                        | _ -> failwith "not implemented lambda body"
                                                 | None -> 
-                                                    createTypeSelect (Queryable.TypeSystem.getElementType (queryable.GetType()))
+                                                    createFullTypeSelect (Queryable.TypeSystem.getElementType (queryable.GetType()))
                                 let topStatement = 
                                     let count = 
                                         if single.IsSome || singleOrDefault.IsSome then
@@ -486,7 +562,7 @@ module QueryTranslator =
         cmd
 
     let translateToCommand queryDialect queryType getDBType getTableName getColumnName connection expression =
-        let ps = translate queryType queryDialect getDBType getTableName getColumnName expression
+        let ps = translate queryDialect queryType getDBType getTableName getColumnName expression
 
         let cmd = createCommand connection ps
 

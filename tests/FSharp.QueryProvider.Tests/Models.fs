@@ -45,3 +45,22 @@ type NoId =
 type NoVersion =
     { Id : int
       Name : string }
+
+module Data =
+    let johnDoe = {
+        PersonId = 1
+        PersonName = "john doe"
+        JobKind = JobKind.Salesman
+        VersionNo = 5
+    }
+    let jamesWilson = {
+        PersonId = 2
+        PersonName = "james wilson"
+        JobKind = JobKind.Manager
+        VersionNo = 6
+    }
+module DataReaderData =
+    let persons : obj list list= [
+        [1; "john doe"; 0; 5]
+        [2; "james wilson"; 1; 6]
+    ]

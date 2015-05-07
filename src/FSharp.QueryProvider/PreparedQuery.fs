@@ -12,5 +12,5 @@ type PreparedStatement<'P> = {
     Text : string
     FormattedText : string
     Parameters : PreparedParameter<'P> seq
-    ResultConstructionInfo : TypeConstructionInfo option
+    ResultConstructionInfo : ConstructionInfo option
 }

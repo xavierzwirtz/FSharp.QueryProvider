@@ -43,7 +43,7 @@ let getExpression (f : IQueryable<'t> -> 'r) =
         else
             provider.Expressions |> Seq.last
 
-let AreEqualTranslateExpression (translate : Expression -> PreparedStatement<_>) get expectedSql (expectedParameters: list<PreparedParameter<_>>) (expectedResultConstructionInfo) : unit =
+let AreEqualTranslateExpression (translate : Expression -> PreparedStatement<_>) get expectedSql (expectedParameters: list<PreparedParameter<_>>) (expectedResultConstructionInfo : ConstructionInfo) : unit =
         
     let expression = getExpression get
 
@@ -63,11 +63,20 @@ let AreEqualTranslateExpression (translate : Expression -> PreparedStatement<_>)
         match a with
         | None -> false
         | Some a -> 
-            e.ReturnType = a.ReturnType &&
-            e.Type = a.Type &&
-            compareSeq e.PropertySets a.PropertySets &&
-            compareSeq e.ConstructorArgs a.ConstructorArgs
-         
+            if e.ReturnType <> a.ReturnType then
+                false
+            else
+                match e.TypeOrLambda, a.TypeOrLambda with 
+                | TypeOrLambdaConstructionInfo.Type et, TypeOrLambdaConstructionInfo.Type at ->
+                    e.Type = a.Type &&
+                    et.Type = at.Type &&
+                    compareSeq et.PropertySets at.PropertySets &&
+                    compareSeq et.ConstructorArgs at.ConstructorArgs
+                | TypeOrLambdaConstructionInfo.Lambda _, TypeOrLambdaConstructionInfo.Lambda _ ->
+                    failwith "dont use this function to check lambda constructors"
+                | TypeOrLambdaConstructionInfo.Lambda _, TypeOrLambdaConstructionInfo.Type _ -> false
+                | TypeOrLambdaConstructionInfo.Type _, TypeOrLambdaConstructionInfo.Lambda _ -> false
+
     if not ctorEqual then
         Assert.Fail(sprintf "Expected: \n%A \n\nActual: \n%A" (expectedResultConstructionInfo) (sqlQuery.ResultConstructionInfo))
 
@@ -79,9 +88,21 @@ let AreEqualDeleteOrSelectExpression get select expectedSql (expectedParameters:
     AreEqualExpression get (select + expectedSql) expectedParameters expectedResultConstructionInfo
     let expression = getExpression get
     let deleteQuery = (QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.DeleteQuery None None None) expression
-    Assert.AreEqual("DELETE " + expectedSql, deleteQuery.Text)
+    Assert.AreEqual("DELETE T " + expectedSql, deleteQuery.Text)
     Assert.AreEqual(None, deleteQuery.ResultConstructionInfo)
     areSeqEqual deleteQuery.Parameters (expectedParameters |> List.toSeq)
+
+let AreEqualExpressionLambdaCtor get expectedSql data =
+    let expression = getExpression get
+    let sqlQuery = (QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.SelectQuery None None None) expression
+    Assert.AreEqual(expectedSql, sqlQuery.Text)
+
+    let reader = 
+        new LocalDataReader.LocalDataReader(data)
+
+    match sqlQuery.ResultConstructionInfo with
+    | None -> failwith "Should have ctor"
+    | Some ctor -> read reader ctor
 
 //use for test data:
 //http://fsprojects.github.io/FSharp.Linq.ComposableQuery/QueryExamples.html
@@ -97,14 +118,25 @@ module QueryGenTest =
     type MutableObject() = 
         [<DefaultValue>] val mutable Value : string
 
+    let justPersonSelect i =
+        {
+            Type = typedefof<Person>
+            ConstructorArgs = ([0..3] |> Seq.map(fun v -> Value (i + v)))
+            PropertySets = []
+        }
+
     let personSelectType returnType i = 
-        createTypeConstructionInfo typedefof<Person> returnType ([0..3] |> Seq.map(fun v -> Value (i + v))) []
+        {
+            ReturnType = returnType
+            Type = typedefof<Person>
+            TypeOrLambda = TypeOrLambdaConstructionInfo.Type (justPersonSelect i)
+        }
 
     let personSelect = personSelectType Many
     
     let employeeSelect i = 
         let createSome t i =
-            Type (createTypeConstructionInfo t Single ([Value i]) [])
+            Type (createTypeConstructionInfo t ([Value i]) [])
          
         let ctorArgs = [
             createSome (Some(1).GetType()) (0 + i) 
@@ -113,28 +145,54 @@ module QueryGenTest =
             createSome (Some(1).GetType()) (3 + i)
             Value (4 + i)
         ]
-        createTypeConstructionInfo typedefof<Employee> Many ctorArgs []
+        {
+            ReturnType = Many
+            Type = typedefof<Employee>
+            TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
+                Type = typedefof<Employee>
+                ConstructorArgs = ctorArgs
+                PropertySets = []
+            }
+        }
+        //TypeOrLambdaConstructionInfo.Type (createTypeConstructionInfo typedefof<Employee> Many ctorArgs [])
 
-    let simpleSelect t i = {
-        ReturnType = Many
-        Type = t
-        ConstructorArgs = [Value i] 
-        PropertySets = [] 
-    }
+    let simpleSelect t i = 
+        {
+            ReturnType = Many
+            Type = t
+            TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
+                Type = t
+                ConstructorArgs = [Value i] 
+                PropertySets = []
+            }
+        }
+    let lambdaSelect t returnType lambda parameters = 
+        {
+            ReturnType = returnType
+            Type = t
+            TypeOrLambda = TypeOrLambdaConstructionInfo.Lambda {
+                Lambda = lambda
+                Parameters = parameters
+            }
+        }
 
-    let simpleOneSelect t i = {
-        ReturnType = Single
-        Type = t
-        ConstructorArgs = [Value i] 
-        PropertySets = [] 
-    }
+    let simpleOneSelect t i = 
+        {
+            ReturnType = Single
+            Type = t
+            TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
+                Type = t
+                ConstructorArgs = [Value i] 
+                PropertySets = []
+            }
+        }
 
     let stringSelect = simpleSelect typedefof<string>
     let intSelect = simpleSelect typedefof<int>
     let boolSelect = simpleSelect typedefof<bool>
 
     [<Test>]
-    let ``simple select``() =
+    let ``select simple``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
                 for p in persons do
@@ -144,7 +202,142 @@ module QueryGenTest =
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelect 0)
 
     [<Test>]
-    let ``simple where``() =
+    let ``select fun invoke``() =
+        let func p = 
+            { p with PersonName = p.PersonName + "mod" }
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                select(func p)
+            }
+        
+        let persons = AreEqualExpressionLambdaCtor q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let persons = persons :?> seq<Person>
+        areSeqEqual [func Data.johnDoe; func Data.jamesWilson] persons
+
+    [<Test>]
+    let ``select fun inline``() =
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                select(fun () -> p)
+            }
+        
+        let funcs = AreEqualExpressionLambdaCtor q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let funcs = funcs :?> seq<unit -> Person>
+        let persons = (funcs |> Seq.map(fun f -> f()))
+        areSeqEqual [Data.johnDoe; Data.jamesWilson] persons
+        
+    [<Test>]
+    let ``select fun self execute``() =
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                select((fun () -> p)())
+            }
+        
+        let persons = AreEqualExpressionLambdaCtor q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let persons = persons :?> seq<Person>
+        areSeqEqual [Data.johnDoe; Data.jamesWilson] persons
+
+    [<Test>]
+    let ``select fun two arg invoke``() =
+        let func p1 p2 = 
+            { p1 with PersonName = p1.PersonName + p2.PersonName }
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                select(func p p)
+            }
+        
+        let persons = AreEqualExpressionLambdaCtor q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let persons = persons :?> seq<Person>
+        areSeqEqual [func Data.johnDoe Data.johnDoe; func Data.jamesWilson Data.jamesWilson] persons
+        
+    [<Test>]
+    let ``select fun two local arg invoke``() =
+        let func p m = 
+            { p with PersonName = p.PersonName + m }
+        let m = "mod"
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                select(func p m)
+            }
+        
+        let persons = AreEqualExpressionLambdaCtor q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let persons = persons :?> seq<Person>
+        areSeqEqual [func Data.johnDoe m; func Data.jamesWilson m] persons
+
+    [<Test; Ignore("Partial selecting when lambda is applied is not supported yet.")>]
+    let ``select fun partial``() =
+        let func name = 
+            name + "mod"
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                select(func p.PersonName)
+            }
+        
+        let persons = AreEqualExpressionLambdaCtor q "SELECT T.PersonName FROM Person AS T" DataReaderData.persons
+        let personNames = persons :?> seq<string>
+        areSeqEqual [func Data.johnDoe.PersonName; func Data.jamesWilson.PersonName] personNames
+
+    [<Test>]
+    let ``select fun partial applied``() =
+        let func p m = 
+            { p with PersonName = p.PersonName + m }
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                select(func p)
+            }
+        
+        let funcs = AreEqualExpressionLambdaCtor q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let funcs = funcs :?> seq<string -> Person>
+        let persons = (funcs |> Seq.map(fun f -> f "mod"))
+        areSeqEqual [func Data.johnDoe "mod"; func Data.jamesWilson "mod"] persons
+
+    [<Test>]
+    let ``select fun full + partial``() =
+        let func p m = 
+            { p with PersonName = p.PersonName + m }
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                select(func p p.PersonName)
+            }
+        
+        let persons = AreEqualExpressionLambdaCtor q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let persons = persons :?> seq<Person>
+        areSeqEqual [func Data.johnDoe Data.johnDoe.PersonName; func Data.jamesWilson Data.jamesWilson.PersonName] persons
+
+    [<Test>]
+    let ``select some``() =
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                select(Some p)
+            }
+        
+        let persons = AreEqualExpressionLambdaCtor q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let persons = persons :?> seq<Person option>
+        areSeqEqual [Some Data.johnDoe; Some Data.jamesWilson] persons
+
+    [<Test; Ignore("Partial selecting when lambda is applied is not supported yet.")>]
+    let ``select some partial``() =
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                select(Some p.PersonName)
+            }
+        
+        let persons = AreEqualExpressionLambdaCtor q "SELECT T.PersonName FROM Person AS T" DataReaderData.persons
+        let personNames = persons :?> seq<string option>
+        areSeqEqual [Some Data.johnDoe.PersonName; Some Data.jamesWilson.PersonName] personNames
+
+    [<Test>]
+    let ``where simple``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
                 for p in persons do
@@ -447,7 +640,7 @@ module QueryGenTest =
         ] (personSelect(0))
 
     [<Test>]
-    let ``partial select``() =
+    let ``select partial``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
                 for p in persons do
@@ -471,7 +664,7 @@ module QueryGenTest =
 
     [<Test>]
     [<Ignore("Bug in fsharp compiler")>]
-    let ``partial tuple select``() =
+    let ``select partial tuple``() =
         ignore()
         //This is broken in the fsharp compiler.
         //https://github.com/Microsoft/visualfsharp/issues/47
@@ -616,7 +809,7 @@ module QueryGenTest =
         AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType Single 0)
 
     [<Test>]
-    let ``exactlyOne partial select``() =
+    let ``select exactlyOne partial``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
                 for p in persons do
@@ -650,7 +843,7 @@ module QueryGenTest =
         AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType SingleOrDefault 0)
 
     [<Test>]
-    let ``exactlyOneOrDefault partial select``() =
+    let ``select exactlyOneOrDefault partial``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
                 for p in persons do
@@ -780,7 +973,7 @@ module QueryGenTest =
 
     [<Test>]
     [<Ignore("Not implemented")>]
-    let ``groupBy select``() =
+    let ``select groupBy``() =
         ignore()
 //        let q = fun () -> 
 //            query {
@@ -794,7 +987,7 @@ module QueryGenTest =
 
     [<Test>]
     [<Ignore("Not implemented")>]
-    let ``groupBy where select``() =
+    let ``select groupBy where``() =
         ignore()
 //        let q = fun () -> 
 //            query {
