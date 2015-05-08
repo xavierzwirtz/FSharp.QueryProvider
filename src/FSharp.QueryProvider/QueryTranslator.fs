@@ -19,7 +19,7 @@ module QueryTranslator =
     | SelectQuery
     | DeleteQuery
 
-    let private defaultGetDBType (morP : TypeSource) : SqlDbType DBType =
+    let private defaultGetSql2012DBType (morP : TypeSource) : SqlDbType DBType =
         let t = 
             match morP with 
             | Method m -> m.ReturnType
@@ -29,12 +29,26 @@ module QueryTranslator =
         let t = unwrapType t
         match System.Type.GetTypeCode(t) with 
         | System.TypeCode.Boolean -> DataType SqlDbType.Bit
-        | System.TypeCode.String -> DataType SqlDbType.NVarChar
-        | System.TypeCode.DateTime -> DataType SqlDbType.DateTime2
         | System.TypeCode.Byte -> DataType SqlDbType.TinyInt
+        | System.TypeCode.Char -> DataType SqlDbType.NVarChar
+        | System.TypeCode.DateTime -> DataType SqlDbType.DateTime2
+        | System.TypeCode.Decimal -> DataType SqlDbType.Decimal
+        | System.TypeCode.Double -> DataType SqlDbType.Float
         | System.TypeCode.Int16 -> DataType SqlDbType.SmallInt
         | System.TypeCode.Int32 -> DataType SqlDbType.Int
         | System.TypeCode.Int64 -> DataType SqlDbType.BigInt
+        | System.TypeCode.SByte -> DataType SqlDbType.TinyInt
+        | System.TypeCode.Single -> DataType SqlDbType.Real
+        | System.TypeCode.String -> DataType SqlDbType.NVarChar
+        | System.TypeCode.UInt16 -> DataType SqlDbType.TinyInt
+        | System.TypeCode.UInt32 -> DataType SqlDbType.Int
+        | System.TypeCode.UInt64 -> DataType SqlDbType.BigInt
+        | System.TypeCode.Empty -> Unhandled
+        | System.TypeCode.Object -> 
+            if t = typedefof<System.Guid> then
+                DataType SqlDbType.UniqueIdentifier
+            else
+                Unhandled
         | _t -> Unhandled
 
     let private defaultGetTableName (t:System.Type) : string =
@@ -133,11 +147,11 @@ module QueryTranslator =
             | Some g -> fun morP -> 
                 match g morP with
                 | Unhandled -> 
-                    match defaultGetDBType morP with
+                    match defaultGetSql2012DBType morP with
                     | Unhandled -> failwithf "Could not determine DataType for '%A' is not handled" morP
                     | r -> r
                 | r -> r
-            | None -> defaultGetDBType
+            | None -> defaultGetSql2012DBType
 
         let getColumnName =
             match getColumnName with
