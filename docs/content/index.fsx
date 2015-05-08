@@ -32,7 +32,7 @@ open FSharp.QueryProvider.QueryTranslator
 open FSharp.QueryProvider.Queryable
 open System.Data
 
-let connectionString = "Server=localhost;Database=Soma.Core.IT;Trusted_Connection=True;"
+let connectionString = "Server=localhost;Database=Northwind;Trusted_Connection=True;"
 
 let queryProvider =
     DBQueryProvider (
