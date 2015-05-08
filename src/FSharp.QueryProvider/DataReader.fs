@@ -68,32 +68,30 @@ and constructType reader typeCtor =
         | Type _ -> failwith "Shouldnt be Type"
         | Value i -> i
 
+    let getValue i = 
+        let typeName = reader.GetDataTypeName i
+        let value = reader.GetValue i 
+        if typeName = "char" then
+            let str = value :?> string 
+            str.TrimEnd() :> obj
+        else
+            value
+
     let t = typeCtor.Type
-    if t = typedefof<string> then
-        reader.GetString (getSingleIndex()) :> obj
-    else if t = typedefof<bool> then
-        reader.GetBoolean (getSingleIndex()) :> obj
-    else if t = typedefof<byte> then
-        reader.GetByte (getSingleIndex()) :> obj
-    //else if t = typedefof<sbyte> then
-    else if t = typedefof<char> then
-        reader.GetChar (getSingleIndex()) :> obj
-    else if t = typedefof<System.DateTime> then
-        reader.GetDateTime (getSingleIndex()) :> obj
-    else if t = typedefof<decimal> then
-        reader.GetDecimal (getSingleIndex()) :> obj
-    else if t = typedefof<double> then
-        reader.GetDouble (getSingleIndex()) :> obj
-    else if t = typedefof<float> then
-        reader.GetFloat (getSingleIndex()) :> obj
-    else if t = typedefof<System.Guid> then
-        reader.GetGuid (getSingleIndex()) :> obj
-    else if t = typedefof<int16> then
-        reader.GetInt16 (getSingleIndex()) :> obj
-    else if t = typedefof<int32> then
-        reader.GetInt32 (getSingleIndex()) :> obj
-    else if t = typedefof<int64> then
-        reader.GetInt64 (getSingleIndex()) :> obj
+    if t = typedefof<string> ||
+        t = typedefof<bool> ||
+        t = typedefof<byte> ||
+        t = typedefof<sbyte> ||
+        t = typedefof<char> ||
+        t = typedefof<System.DateTime> ||
+        t = typedefof<decimal> ||
+        t = typedefof<double> ||
+        t = typedefof<float> ||
+        t = typedefof<System.Guid> ||
+        t = typedefof<int16> ||
+        t = typedefof<int32> ||
+        t = typedefof<int64> then
+        getValue (getSingleIndex())
     else if isOption t then
         let value = reader.GetValue (getSingleIndex())
         if value <> null then
@@ -106,7 +104,7 @@ and constructType reader typeCtor =
             |> Seq.map(fun arg -> 
                 match arg with 
                 | Type t -> constructType reader t
-                | Value i -> reader.GetValue i
+                | Value i -> getValue i
             )
 
         let inst = 
