@@ -530,14 +530,6 @@ module QueryTranslator =
                             let param = valueToQueryAndParam (getDBType (TypeSource.Value value)) value
                             Some (param)
                         | None -> failwithf "The member '%s' is not supported" m.Member.Name
-//                        let accessChain = getConstantAccessChain m
-//                        printfn "%A" accessChain
-                        
-//                        match accessChain with
-//                        | Some constant, accesses ->
-//                            failwith "foobar"
-//                        | None -> 
-//                            failwithf "The member '%s' is not supported" m.Member.Name
                 | _ -> None
 
             match result with

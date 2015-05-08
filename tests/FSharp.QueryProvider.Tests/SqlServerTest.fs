@@ -80,8 +80,6 @@ let AreEqualTranslateExpression (translate : Expression -> PreparedStatement<_>)
     if not ctorEqual then
         Assert.Fail(sprintf "Expected: \n%A \n\nActual: \n%A" (expectedResultConstructionInfo) (sqlQuery.ResultConstructionInfo))
 
-    printfn "%s" (sqlQuery.FormattedText)
-
 let AreEqualExpression get = AreEqualTranslateExpression (QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.SelectQuery None None None) get
 
 let AreEqualDeleteOrSelectExpression get select expectedSql (expectedParameters: list<PreparedParameter<_>>) (expectedResultConstructionInfo) : unit =
