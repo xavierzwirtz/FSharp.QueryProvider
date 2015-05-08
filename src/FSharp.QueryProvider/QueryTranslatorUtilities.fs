@@ -121,7 +121,7 @@ let rec unwrapValue value =
 let rec valueToQueryAndParam (columnIndex : int) (dbType : DBType<_>) (value : obj)= 
     let value = unwrapValue value
     match dbType with
-    | Unhandled -> failwith "Shouldnt ever get to this point with this value"
+    | Unhandled -> failwithf "Unable to determine sql data type for type '%s'" (value.GetType().Name)
     | DataType t ->
         createParameter columnIndex value t
 
