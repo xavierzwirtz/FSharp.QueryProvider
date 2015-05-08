@@ -8,7 +8,7 @@ open System.Linq.Expressions
 open System.Collections
 open System.Collections.Generic
 
-module TypeSystem = 
+module internal TypeSystem = 
    
     let implements implementerType (interfaceType : System.Type) =
         interfaceType.IsAssignableFrom(implementerType)
@@ -51,6 +51,9 @@ module TypeSystem =
         | Some(ienum) ->  ienum
             //ienum.GetGenericArguments() |> Seq.head
 
+/// <summary>
+/// Type to remove boiler plate when implementing IQueryProvider
+/// </summary>
 type Query<'T>(provider : QueryProvider, expression : Expression option) as this = 
     
     let hardExpression = 
@@ -88,6 +91,9 @@ type Query<'T>(provider : QueryProvider, expression : Expression option) as this
         | None -> sprintf "value(Query<%s>)" typedefof<'T>.Name
         //hardExpression.ToString()
 
+/// <summary>
+/// Type to remove boiler plate when implementing IQueryProvider
+/// </summary>
 and [<AbstractClass>] QueryProvider() =
     interface IQueryProvider with 
         
@@ -113,6 +119,14 @@ and [<AbstractClass>] QueryProvider() =
 
     abstract member Execute : Expression -> obj
 
+/// <summary>
+/// Reusable IQueryProvider for IDbConnection.
+/// </summary>
+/// <param name="getConnection">function to get an unopened IDbConnection</param> 
+/// <param name="getConnection">function that transforms a IDbConnection and Linq.Expression into a
+/// fully constructed IDbCommand and DataReader.ConstructionInfo </param> 
+/// <param name="onExecutingCommand">function fired right before executing the reader. The return `obj` is passed into `onExecutedCommand`</param>
+/// <param name="onExecutedCommand">function fired right after executing the reader.</param>
 type DBQueryProvider<'T when 'T :> System.Data.IDbConnection>
     (
     getConnection : unit -> 'T, 
@@ -140,4 +154,4 @@ type DBQueryProvider<'T when 'T :> System.Data.IDbConnection>
         with 
         | e -> 
             printfn "Exception during query Execute: %s" (e.ToString())
-            raise e
+            reraise ()

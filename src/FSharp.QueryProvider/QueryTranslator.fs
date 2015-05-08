@@ -12,9 +12,15 @@ open FSharp.QueryProvider.PreparedQuery
 
 module QueryTranslator =
 
+    /// <summary>
+    /// The different sql dialects to translate to.
+    /// </summary>
     type QueryDialect = 
     | SqlServer2012
 
+    /// <summary>
+    /// The type of query to create.
+    /// </summary>
     type QueryType =
     | SelectQuery
     | DeleteQuery
@@ -134,6 +140,15 @@ module QueryTranslator =
         else
             failwith "not implemented, only records are currently implemented"
 
+    /// <summary>
+    /// Takes a Linq.Expression tree and produces a sql query and DataReader.ConstructionInfo to construct the resulting data.
+    /// </summary>
+    /// <param name="_queryDialect"></param>
+    /// <param name="queryType"></param>
+    /// <param name="getDBType">Called to determine the DbType for a TypeSource</param>
+    /// <param name="getTableName">Called to determine the table name for a Type</param>
+    /// <param name="getColumnName">Called to determine the column name for a Reflection.MemberInfo</param>
+    /// <param name="expression">The Linq.Expression to translate</param>
     let translate 
         (_queryDialect : QueryDialect)
         (queryType : QueryType)
@@ -555,6 +570,11 @@ module QueryTranslator =
                     Some (resultConstructionInfo |> Seq.exactlyOne)
         }
 
+    /// <summary>
+    /// Create IDbCommand from a PreparedStatement
+    /// </summary>
+    /// <param name="connection"></param>
+    /// <param name="preparedStatement"></param>
     let createCommand (connection : System.Data.SqlClient.SqlConnection) (preparedStatement : PreparedStatement<SqlDbType>) =
         
         let cmd = connection.CreateCommand()
@@ -567,6 +587,16 @@ module QueryTranslator =
             cmd.Parameters.Add(sqlParam) |> ignore
         cmd
 
+    /// <summary>
+    /// Translate a Linq.Expression to an IDbCommand
+    /// </summary>
+    /// <param name="queryDialect"></param>
+    /// <param name="queryType"></param>
+    /// <param name="getDBType"></param>
+    /// <param name="getTableName"></param>
+    /// <param name="getColumnName"></param>
+    /// <param name="connection"></param>
+    /// <param name="expression"></param>
     let translateToCommand queryDialect queryType getDBType getTableName getColumnName connection expression =
         let ps = translate queryDialect queryType getDBType getTableName getColumnName expression
 

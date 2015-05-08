@@ -7,7 +7,7 @@ type ExpressionResult =
      | Replace of Expression
      | Skip
 
-type Visitor(visit : Expression -> ExpressionResult) =
+type private Visitor(visit : Expression -> ExpressionResult) =
     inherit ExpressionVisitor()
 
     override this.Visit expression =
@@ -17,7 +17,7 @@ type Visitor(visit : Expression -> ExpressionResult) =
         | Replace e -> e
         | Skip -> expression
         
-let rec stripQuotes (expression : Expression) = 
+let rec internal stripQuotes (expression : Expression) = 
     if expression.NodeType = ExpressionType.Quote then
         stripQuotes ((expression :?> UnaryExpression).Operand)
     else 
