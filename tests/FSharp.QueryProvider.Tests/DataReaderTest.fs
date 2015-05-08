@@ -345,7 +345,17 @@ let ``option some``() =
     Assert.AreEqual({OptionValue = Some "first"}, result)
 
 [<Test>]
-let ``option none``() =
+let ``option none from dbnull``() =
+
+    let reader = 
+        new LocalDataReader([[System.DBNull.Value]])
+
+    let result = (read reader (ctorOptionNameFull Single)) :?> OptionName
+
+    Assert.AreEqual({OptionValue = None}, result)
+
+[<Test>]
+let ``option none from null``() =
 
     let reader = 
         new LocalDataReader([[null]])

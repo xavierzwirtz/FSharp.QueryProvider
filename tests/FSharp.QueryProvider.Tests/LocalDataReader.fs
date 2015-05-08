@@ -44,8 +44,8 @@ type LocalDataReader(data : obj list list) =
             failwith "Not implemented yet"
         
         member x.GetDataTypeName(_i: int): string = 
-            failwith "Not implemented yet"
-        
+            ""
+
         member x.GetDateTime(i: int): System.DateTime = 
             field i :?> System.DateTime
         

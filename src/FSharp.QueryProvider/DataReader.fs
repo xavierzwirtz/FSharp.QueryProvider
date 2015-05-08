@@ -93,11 +93,15 @@ and constructType reader typeCtor =
         t = typedefof<int64> then
         getValue (getSingleIndex())
     else if isOption t then
-        let value = reader.GetValue (getSingleIndex())
-        if value <> null then
-            t.GetMethod("Some").Invoke(null, [| value |])
-        else
+        let i = getSingleIndex()
+        if reader.IsDBNull(i) then
             None :> obj
+        else
+            let value = reader.GetValue (i)
+            if value <> null then
+                t.GetMethod("Some").Invoke(null, [| value |])
+            else
+                None :> obj
     else
         let ctorArgs = 
             typeCtor.ConstructorArgs
