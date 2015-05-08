@@ -7,7 +7,7 @@
 FSharp.QueryProvider
 ======================
 
-Documentation
+Modular Linq provider library for .Net. Use it to easily add a Linq provider to your orm.
 
 <div class="row">
   <div class="span1"></div>
@@ -23,13 +23,47 @@ Documentation
 Example
 -------
 
-This example demonstrates using a function defined in this sample library.
+Example for doing a like query against a simple person type.
 
 *)
-#r "FSharp.QueryProvider.dll"
-open FSharp.QueryProvider
+#I "../../bin"
+#r "FSharp.QueryProvider/FSharp.QueryProvider.dll"
+open FSharp.QueryProvider.QueryTranslator
+open FSharp.QueryProvider.Queryable
+open System.Data
 
-printfn "hello = %i" <| Library.hello 0
+let connectionString = "Server=localhost;Database=Soma.Core.IT;Trusted_Connection=True;"
+
+let queryProvider =
+    DBQueryProvider (
+        (fun () -> new SqlClient.SqlConnection(connectionString)), 
+        (fun connection expression ->
+            let command, ctor = translateToCommand QueryDialect.SqlServer2012 SelectQuery None None None connection expression
+            let ctor =
+                match ctor with
+                | Some ctor -> ctor
+                | None -> failwith "no ctorinfor generated"
+            command :> IDbCommand, ctor), 
+        None, 
+        None)
+
+type JobKind =
+| Salesman = 0
+| Manager = 1
+
+type Person =
+    { PersonId : int
+      PersonName : string
+      JobKind : JobKind
+      VersionNo : int }
+
+let does = query {
+    for p in makeQuery<Person>(queryProvider) do
+    where(p.PersonName.Contains "doe")
+    select p
+}
+
+printfn "%A" (does |> Seq.toList)
 
 (**
 Some more info

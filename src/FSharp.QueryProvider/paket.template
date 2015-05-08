@@ -14,10 +14,9 @@ requireLicenseAcceptance
 copyright
     Copyright 2015
 tags
-    f#
+    f# linq
 summary
     Makes implementing IQueryable and IQueryProvider in F# functional and easy.
 description
-    Description not set
-
-
+    Makes implementing IQueryable and IQueryProvider in F# functional and easy.
+	

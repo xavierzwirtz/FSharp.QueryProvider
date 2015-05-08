@@ -119,6 +119,8 @@ and [<AbstractClass>] QueryProvider() =
 
     abstract member Execute : Expression -> obj
 
+let makeQuery<'t> queryProvider =
+    Query<'t>(queryProvider, None) :> System.Linq.IQueryable<'t>
 /// <summary>
 /// Reusable IQueryProvider for IDbConnection.
 /// </summary>
