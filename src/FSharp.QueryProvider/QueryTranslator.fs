@@ -255,10 +255,10 @@ module QueryTranslator =
                             mapd {TableAlias = Some tableAlias; TopQuery = false} e
 
                         let getReturnType () =
-                            let isSome l = l |> List.exists(fun (m : option<_>)-> m.IsSome)
-                            if [single; first] |> isSome then
+                            let isSome (o : option<_>) = o.IsSome
+                            if isSome single || isSome first || isSome max || isSome min then
                                 Single
-                            else if [singleOrDefault; firstOrDefault] |> isSome then
+                            else if isSome singleOrDefault || isSome firstOrDefault then
                                 SingleOrDefault
                             else
                                 Many
@@ -294,7 +294,7 @@ module QueryTranslator =
                                                 let t = l.ReturnType
                                                 let c = 
                                                     if context.TopQuery then
-                                                        [createConstructionInfoForType 0 t Many]
+                                                        [createConstructionInfoForType 0 t (getReturnType())]
                                                     else
                                                         []
                                                 let q, p, _ = (l.Body |> map) 

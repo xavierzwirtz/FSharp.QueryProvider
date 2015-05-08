@@ -156,9 +156,9 @@ module QueryGenTest =
         }
         //TypeOrLambdaConstructionInfo.Type (createTypeConstructionInfo typedefof<Employee> Many ctorArgs [])
 
-    let simpleSelect t i = 
+    let simpleSelect t i returnType = 
         {
-            ReturnType = Many
+            ReturnType = returnType
             Type = t
             TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
                 Type = t
@@ -647,7 +647,7 @@ module QueryGenTest =
                 select p.PersonName
             }
         
-        AreEqualExpression q "SELECT T.PersonName FROM Person AS T" [] (stringSelect(0))
+        AreEqualExpression q "SELECT T.PersonName FROM Person AS T" [] (stringSelect 0 Many)
 
     [<Test>]
     let ``partial select with where``() =
@@ -660,7 +660,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT T.PersonName FROM Person AS T WHERE (T.PersonName = @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-        ] (stringSelect(0))
+        ] (stringSelect 0 Many)
 
     [<Test>]
     [<Ignore("Bug in fsharp compiler")>]
@@ -817,7 +817,7 @@ module QueryGenTest =
                 exactlyOne
             }
         
-        AreEqualExpression q "SELECT TOP 2 T.PersonId FROM Person AS T" [] (intSelect 0)
+        AreEqualExpression q "SELECT TOP 2 T.PersonId FROM Person AS T" [] (intSelect 0 Single)
 
     [<Test>]
     let ``exactlyOne where``() =
@@ -851,7 +851,7 @@ module QueryGenTest =
                 exactlyOneOrDefault
             }
         
-        AreEqualExpression q "SELECT TOP 2 T.PersonId FROM Person AS T" [] (intSelect 0)
+        AreEqualExpression q "SELECT TOP 2 T.PersonId FROM Person AS T" [] (intSelect 0 SingleOrDefault)
 
     [<Test>]
     let ``exactlyOneOrDefault where``() =
@@ -920,7 +920,7 @@ module QueryGenTest =
                 minBy p.PersonId
             }
         
-        AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T ORDER BY T.PersonId ASC" [] (intSelect 0)
+        AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T ORDER BY T.PersonId ASC" [] (intSelect 0 Single)
     
     [<Test>]
     let ``minBy where``() =
@@ -933,7 +933,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T WHERE (T.PersonName = @p1) ORDER BY T.PersonId ASC" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-        ] (intSelect 0)
+        ] (intSelect 0 Single)
 
     [<Test>]
     let ``maxBy``() =
@@ -943,7 +943,7 @@ module QueryGenTest =
                 maxBy p.PersonId
             }
         
-        AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T ORDER BY T.PersonId DESC" [] (intSelect 0)
+        AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T ORDER BY T.PersonId DESC" [] (intSelect 0 Single)
     
     [<Test>]
     let ``maxBy where``() =
@@ -956,7 +956,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T WHERE (T.PersonName = @p1) ORDER BY T.PersonId DESC" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
-        ] (intSelect 0)
+        ] (intSelect 0 Single)
 
     [<Test>]
     [<Ignore("Not implemented")>]
