@@ -1,5 +1,5 @@
 ﻿module DataReaderTest
-open NUnit.Framework
+
 open FSharp.QueryProvider
 open FSharp.QueryProvider.DataReader
 
@@ -85,87 +85,87 @@ let ctorVerboseRecord returnType =
         }
     }
 
-[<Test>]
+[<Fact>]
 let ``one string``() =
     let reader = new LocalDataReader([["foo bar"]])
     let result = (read reader (ctorOneSimple typedefof<string>)) :?> string
-    Assert.AreEqual("foo bar", result)
-[<Test>]
+    Assert.Equal("foo bar", result)
+[<Fact>]
 let ``one bool true``() =
     let reader = new LocalDataReader([[true]])
     let result = (read reader (ctorOneSimple typedefof<bool>)) :?> bool
-    Assert.AreEqual(true, result)
-[<Test>]
+    Assert.Equal(true, result)
+[<Fact>]
 let ``one bool false``() =
     let reader = new LocalDataReader([[false]])
     let result = (read reader (ctorOneSimple typedefof<bool>)) :?> bool
-    Assert.AreEqual(false , result)
-//[<Test>]
+    Assert.Equal(false , result)
+//[<Fact>]
 //let ``one byte``() =
 //    let reader = new LocalDataReader([[5y]])
 //    let result = (read reader (ctorOneSimple typedefof<sbyte>)) :?> sbyte
-//    Assert.AreEqual(5y, result)
-[<Test>]
+//    Assert.Equal(5y, result)
+[<Fact>]
 let ``one ubyte``() =
     let reader = new LocalDataReader([[5uy]])
     let result = (read reader (ctorOneSimple typedefof<byte>)) :?> byte
-    Assert.AreEqual(5uy, result)
-[<Test>]
+    Assert.Equal(5uy, result)
+[<Fact>]
 let ``one char``() =
     let reader = new LocalDataReader([['g']])
     let result = (read reader (ctorOneSimple typedefof<char>)) :?> char
-    Assert.AreEqual('g' , result)
-[<Test>]
+    Assert.Equal('g' , result)
+[<Fact>]
 let ``one System.DateTime``() =
     let d = System.DateTime.Now
     let reader = new LocalDataReader([[d]])
     let result = (read reader (ctorOneSimple typedefof<System.DateTime>)) :?> System.DateTime
-    Assert.AreEqual(d, result)
-[<Test>]
+    Assert.Equal(d, result)
+[<Fact>]
 let ``one decimal``() =
     let reader = new LocalDataReader([[1.23m]])
     let result = (read reader (ctorOneSimple typedefof<decimal>)) :?> decimal
-    Assert.AreEqual(1.23m, result)
-[<Test>]
+    Assert.Equal(1.23m, result)
+[<Fact>]
 let ``one double``() =
     let reader = new LocalDataReader([[4.14]])
     let result = (read reader (ctorOneSimple typedefof<double>)) :?> double
-    Assert.AreEqual(4.14, result)
-[<Test>]
+    Assert.Equal(4.14, result)
+[<Fact>]
 let ``one float``() =
     let reader = new LocalDataReader([[4.14]])
     let result = (read reader (ctorOneSimple typedefof<float>)) :?> float
-    Assert.AreEqual(4.14, result)
-[<Test>]
+    Assert.Equal(4.14, result)
+[<Fact>]
 let ``one System.Guid``() =
     let g = System.Guid.NewGuid()
     let reader = new LocalDataReader([[g]])
     let result = (read reader (ctorOneSimple typedefof<System.Guid>)) :?> System.Guid
-    Assert.AreEqual(g, result)
-[<Test>]
+    Assert.Equal(g, result)
+[<Fact>]
 let ``one int16``() =
     let reader = new LocalDataReader([[86s]])
     let result = (read reader (ctorOneSimple typedefof<int16>)) :?> int16
-    Assert.AreEqual(86s, result)
-[<Test>]
+    Assert.Equal(86s, result)
+[<Fact>]
 let ``one int32``() =
     let reader = new LocalDataReader([[5]])
     let result = (read reader (ctorOneSimple typedefof<int32>)) :?> int32
-    Assert.AreEqual(5, result)
-[<Test>]
+    Assert.Equal(5, result)
+[<Fact>]
 let ``one int64``() =
     let reader = new LocalDataReader([[5L]])
     let result = (read reader (ctorOneSimple typedefof<int64>)) :?> int64
-    Assert.AreEqual(5L, result)
+    Assert.Equal(5L, result)
 
 //no need to test the many for every type
-[<Test>]
+[<Fact>]
 let ``many string``() =
     let reader = new LocalDataReader([["foo"]; ["bar"]])
     let result = (read reader (ctorManySimple typedefof<string>)) :?> string seq
     areSeqEqual ["foo"; "bar"] result
 
-[<Test>]
+[<Fact>]
 let ``one verbose record``() =
     let d = System.DateTime.Now
     let g = System.Guid.NewGuid()
@@ -204,9 +204,9 @@ let ``one verbose record``() =
         Int64 = 4L
     }
 
-    Assert.AreEqual(e, result)
+    Assert.Equal(e, result)
 
-[<Test>]
+[<Fact>]
 let ``many verbose record``() =
     let d = System.DateTime.Now
     let g = System.Guid.NewGuid()
@@ -275,7 +275,7 @@ let ``many verbose record``() =
 
     areSeqEqual e result
 
-[<Test>]
+[<Fact>]
 let ``single record``() =
 
     let reader = 
@@ -283,9 +283,9 @@ let ``single record``() =
 
     let result = (read reader (ctorName Single)) :?> Name
 
-    Assert.AreEqual({Value = "first"}, result)
+    Assert.Equal({Value = "first"}, result)
 
-[<Test>]
+[<Fact>]
 let ``single record multiple values throws``() =
 
     let reader = 
@@ -293,9 +293,9 @@ let ``single record multiple values throws``() =
 
     let e = Assert.Throws<System.InvalidOperationException>(fun () -> (read reader (ctorName Single)) |> ignore)
 
-    Assert.AreEqual("Sequence contains more than one element", e.Message)
+    Assert.Equal("Sequence contains more than one element", e.Message)
 
-[<Test>]
+[<Fact>]
 let ``single record no values throws``() =
 
     let reader = 
@@ -303,7 +303,7 @@ let ``single record no values throws``() =
 
     let e = Assert.Throws<System.InvalidOperationException>(fun () -> (read reader (ctorName Single)) |> ignore)
 
-    Assert.AreEqual("Sequence contains no elements", e.Message)
+    Assert.Equal("Sequence contains no elements", e.Message)
 
 let ``singleOrDefault record``() =
 
@@ -312,9 +312,9 @@ let ``singleOrDefault record``() =
 
     let result = (read reader (ctorName SingleOrDefault)) :?> Name
 
-    Assert.AreEqual({Value = "first"}, result)
+    Assert.Equal({Value = "first"}, result)
 
-[<Test>]
+[<Fact>]
 let ``singleOrDefault record multiple values throws``() =
 
     let reader = 
@@ -322,9 +322,9 @@ let ``singleOrDefault record multiple values throws``() =
 
     let e = Assert.Throws<System.InvalidOperationException>(fun () -> (read reader (ctorName SingleOrDefault)) |> ignore)
 
-    Assert.AreEqual("Sequence contains more than one element", e.Message)
+    Assert.Equal("Sequence contains more than one element", e.Message)
 
-[<Test>]
+[<Fact>]
 let ``singleOrDefault record no values defaults``() =
 
     let reader = 
@@ -332,9 +332,9 @@ let ``singleOrDefault record no values defaults``() =
 
     let result = (read reader (ctorName SingleOrDefault))
 
-    Assert.AreEqual(null, result)
+    Assert.Equal(null, result)
 
-[<Test>]
+[<Fact>]
 let ``option some``() =
 
     let reader = 
@@ -342,9 +342,9 @@ let ``option some``() =
 
     let result = (read reader (ctorOptionNameFull Single)) :?> OptionName
 
-    Assert.AreEqual({OptionValue = Some "first"}, result)
+    Assert.Equal({OptionValue = Some "first"}, result)
 
-[<Test>]
+[<Fact>]
 let ``option none from dbnull``() =
 
     let reader = 
@@ -352,9 +352,9 @@ let ``option none from dbnull``() =
 
     let result = (read reader (ctorOptionNameFull Single)) :?> OptionName
 
-    Assert.AreEqual({OptionValue = None}, result)
+    Assert.Equal({OptionValue = None}, result)
 
-[<Test>]
+[<Fact>]
 let ``option none from null``() =
 
     let reader = 
@@ -362,11 +362,11 @@ let ``option none from null``() =
 
     let result = (read reader (ctorOptionNameFull Single)) :?> OptionName
 
-    Assert.AreEqual({OptionValue = None}, result)
+    Assert.Equal({OptionValue = None}, result)
 
 open System.Linq.Expressions
 
-[<Test>]
+[<Fact>]
 let ``lambda int add``() =
 
     let reader = 
@@ -388,9 +388,9 @@ let ``lambda int add``() =
         
     let result = (read reader ctor) :?> int
 
-    Assert.AreEqual(7, result)
+    Assert.Equal(7, result)
 
-[<Test>]
+[<Fact>]
 let ``lambda string mod``() =
 
     let reader = 
@@ -412,9 +412,9 @@ let ``lambda string mod``() =
 
     let result = (read reader ctor) :?> string
 
-    Assert.AreEqual("foobar", result)
+    Assert.Equal("foobar", result)
 
-[<Test>]
+[<Fact>]
 let ``lambda type mod``() =
 
     let reader = 
@@ -436,4 +436,4 @@ let ``lambda type mod``() =
 
     let result = (read reader ctor) :?> string
 
-    Assert.AreEqual("foobar", result)
+    Assert.Equal("foobar", result)

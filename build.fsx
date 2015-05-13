@@ -46,7 +46,7 @@ let tags = "f#"
 // File system information 
 let solutionFile  = "FSharp.QueryProvider.sln"
 
-// Pattern specifying assemblies to be tested using NUnit
+// Pattern specifying assemblies to be tested using xUnit
 let testAssemblies = "tests/**/bin/Release/*Tests*.dll"
 
 // Git configuration (used for publishing documentation in gh-pages branch)
@@ -136,11 +136,12 @@ Target "Build" (fun _ ->
 
 Target "RunTests" (fun _ ->
     !! testAssemblies
-    |> NUnit (fun p ->
+    |> Fake.XUnit2Helper.xUnit2 (fun p ->
         { p with
-            DisableShadowCopy = true
+            ShadowCopy = true
             TimeOut = TimeSpan.FromMinutes 20.
-            OutputFile = "TestResults.xml" })
+            //OutputFile = "TestResults.xml"
+            XmlOutput = true })
 )
 
 #if MONO

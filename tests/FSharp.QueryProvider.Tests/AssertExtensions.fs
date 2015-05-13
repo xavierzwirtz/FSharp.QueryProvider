@@ -1,6 +1,5 @@
 ﻿[<AutoOpen>]
 module AssertExtensions
-open NUnit.Framework
 
 let compareSeq a b = 
     if Seq.length a = Seq.length b then
@@ -10,4 +9,5 @@ let compareSeq a b =
     
 let areSeqEqual e a = 
     if not (compareSeq e a) then
-        Assert.Fail(sprintf "Expected: %A \nActual: %A" (e |> Seq.toList) (a |> Seq.toList))
+        let message = sprintf "Expected: %A \nActual: %A" (e |> Seq.toList) (a |> Seq.toList)
+        raise (Xunit.Sdk.AssertActualExpectedException(e, a, message))

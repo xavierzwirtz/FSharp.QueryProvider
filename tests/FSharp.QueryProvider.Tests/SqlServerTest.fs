@@ -1,6 +1,5 @@
 ﻿module SqlServerTest
 
-open NUnit.Framework
 open FSharp.QueryProvider
 open FSharp.QueryProvider.PreparedQuery
 open FSharp.QueryProvider.DataReader
@@ -53,7 +52,7 @@ let AreEqualTranslateExpression (translate : Expression -> PreparedStatement<_>)
         printfn "expression: %s" (expression.ToString())
         printfn "query: %s" sqlQuery.Text
 
-    Assert.AreEqual(expectedSql, sqlQuery.Text)
+    Assert.Equal(expectedSql, sqlQuery.Text)
 
     areSeqEqual sqlQuery.Parameters (expectedParameters |> List.toSeq)
 
@@ -78,7 +77,8 @@ let AreEqualTranslateExpression (translate : Expression -> PreparedStatement<_>)
                 | TypeOrLambdaConstructionInfo.Type _, TypeOrLambdaConstructionInfo.Lambda _ -> false
 
     if not ctorEqual then
-        Assert.Fail(sprintf "Expected: \n%A \n\nActual: \n%A" (expectedResultConstructionInfo) (sqlQuery.ResultConstructionInfo))
+        let message = sprintf "Expected: \n%A \n\nActual: \n%A" (expectedResultConstructionInfo) (sqlQuery.ResultConstructionInfo)
+        raise (Xunit.Sdk.AssertActualExpectedException(expectedResultConstructionInfo, sqlQuery.ResultConstructionInfo, message))
 
 let AreEqualExpression get = AreEqualTranslateExpression (QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.SelectQuery None None None) get
 
@@ -86,14 +86,14 @@ let AreEqualDeleteOrSelectExpression get select expectedSql (expectedParameters:
     AreEqualExpression get (select + expectedSql) expectedParameters expectedResultConstructionInfo
     let expression = getExpression get
     let deleteQuery = (QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.DeleteQuery None None None) expression
-    Assert.AreEqual("DELETE T " + expectedSql, deleteQuery.Text)
-    Assert.AreEqual(None, deleteQuery.ResultConstructionInfo)
+    Assert.Equal("DELETE T " + expectedSql, deleteQuery.Text)
+    Assert.Equal(None, deleteQuery.ResultConstructionInfo)
     areSeqEqual deleteQuery.Parameters (expectedParameters |> List.toSeq)
 
 let AreEqualExpressionLambdaCtor get expectedSql data =
     let expression = getExpression get
     let sqlQuery = (QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.SelectQuery None None None) expression
-    Assert.AreEqual(expectedSql, sqlQuery.Text)
+    Assert.Equal(expectedSql, sqlQuery.Text)
 
     let reader = 
         new LocalDataReader.LocalDataReader(data)
@@ -189,7 +189,7 @@ module QueryGenTest =
     let intSelect = simpleSelect typedefof<int>
     let boolSelect = simpleSelect typedefof<bool>
 
-    [<Test>]
+    [<Fact>]
     let ``select simple``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -199,7 +199,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``select fun invoke``() =
         let func p = 
             { p with PersonName = p.PersonName + "mod" }
@@ -213,7 +213,7 @@ module QueryGenTest =
         let persons = persons :?> seq<Person>
         areSeqEqual [func Data.johnDoe; func Data.jamesWilson] persons
 
-    [<Test>]
+    [<Fact>]
     let ``select fun inline``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -226,7 +226,7 @@ module QueryGenTest =
         let persons = (funcs |> Seq.map(fun f -> f()))
         areSeqEqual [Data.johnDoe; Data.jamesWilson] persons
         
-    [<Test>]
+    [<Fact>]
     let ``select fun self execute``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -238,7 +238,7 @@ module QueryGenTest =
         let persons = persons :?> seq<Person>
         areSeqEqual [Data.johnDoe; Data.jamesWilson] persons
 
-    [<Test>]
+    [<Fact>]
     let ``select fun two arg invoke``() =
         let func p1 p2 = 
             { p1 with PersonName = p1.PersonName + p2.PersonName }
@@ -252,7 +252,7 @@ module QueryGenTest =
         let persons = persons :?> seq<Person>
         areSeqEqual [func Data.johnDoe Data.johnDoe; func Data.jamesWilson Data.jamesWilson] persons
         
-    [<Test>]
+    [<Fact>]
     let ``select fun two local arg invoke``() =
         let func p m = 
             { p with PersonName = p.PersonName + m }
@@ -267,7 +267,7 @@ module QueryGenTest =
         let persons = persons :?> seq<Person>
         areSeqEqual [func Data.johnDoe m; func Data.jamesWilson m] persons
 
-    [<Test; Ignore("Partial selecting when lambda is applied is not supported yet.")>]
+    [<Fact(Skip="Partial selecting when lambda is applied is not supported yet.")>]
     let ``select fun partial``() =
         let func name = 
             name + "mod"
@@ -281,7 +281,7 @@ module QueryGenTest =
         let personNames = persons :?> seq<string>
         areSeqEqual [func Data.johnDoe.PersonName; func Data.jamesWilson.PersonName] personNames
 
-    [<Test>]
+    [<Fact>]
     let ``select fun partial applied``() =
         let func p m = 
             { p with PersonName = p.PersonName + m }
@@ -296,7 +296,7 @@ module QueryGenTest =
         let persons = (funcs |> Seq.map(fun f -> f "mod"))
         areSeqEqual [func Data.johnDoe "mod"; func Data.jamesWilson "mod"] persons
 
-    [<Test>]
+    [<Fact>]
     let ``select fun full + partial``() =
         let func p m = 
             { p with PersonName = p.PersonName + m }
@@ -310,7 +310,7 @@ module QueryGenTest =
         let persons = persons :?> seq<Person>
         areSeqEqual [func Data.johnDoe Data.johnDoe.PersonName; func Data.jamesWilson Data.jamesWilson.PersonName] persons
 
-    [<Test>]
+    [<Fact>]
     let ``select some``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -322,7 +322,7 @@ module QueryGenTest =
         let persons = persons :?> seq<Person option>
         areSeqEqual [Some Data.johnDoe; Some Data.jamesWilson] persons
 
-    [<Test; Ignore("Partial selecting when lambda is applied is not supported yet.")>]
+    [<Fact(Skip="Partial selecting when lambda is applied is not supported yet.")>]
     let ``select some partial``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -334,7 +334,7 @@ module QueryGenTest =
         let personNames = persons :?> seq<string option>
         areSeqEqual [Some Data.johnDoe.PersonName; Some Data.jamesWilson.PersonName] personNames
 
-    [<Test>]
+    [<Fact>]
     let ``where simple``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -347,7 +347,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``extend column name``() =
         
         let q = fun (persons : IQueryable<Person>) -> 
@@ -370,7 +370,7 @@ module QueryGenTest =
             {Name="@p2"; Value=(JobKind.Manager); DbType = System.Data.SqlDbType.Int}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``extend table name``() =
         
         let q = fun (persons : IQueryable<Person>) -> 
@@ -395,7 +395,7 @@ module QueryGenTest =
 
         AreEqualTranslateExpression translate q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM PersonMod AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2))" [] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where local var``() =
         
         let name = ref "john"
@@ -410,7 +410,7 @@ module QueryGenTest =
             {Name="@p1"; Value=(!name); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where property access``() =
         
         let value = { SubValue = {Value = "john" } }
@@ -425,7 +425,7 @@ module QueryGenTest =
             {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where field access``() =
         
         let value = MutableObject()
@@ -441,7 +441,7 @@ module QueryGenTest =
             {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where func property access``() =
         
         let f () = 
@@ -458,7 +458,7 @@ module QueryGenTest =
             {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where local function applied``() =
         
         let f (gen : unit -> string) =
@@ -476,7 +476,7 @@ module QueryGenTest =
         f (fun () -> "john")
         f (fun () -> "jane")
 
-    [<Test>]
+    [<Fact>]
     let ``double where``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -491,7 +491,7 @@ module QueryGenTest =
             {Name="@p2"; Value=5; DbType = System.Data.SqlDbType.Int}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where with single or``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -505,7 +505,7 @@ module QueryGenTest =
             {Name="@p2"; Value="doe"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where with two or``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -520,7 +520,7 @@ module QueryGenTest =
             {Name="@p3"; Value="james"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where option some``() =
         let q = fun (employees : IQueryable<Employee>) -> 
             query {
@@ -532,7 +532,7 @@ module QueryGenTest =
         AreEqualDeleteOrSelectExpression q "SELECT T.EmployeeId, T.EmployeeName, T.DepartmentId, T.VersionNo, T.PersonId " "FROM Employee AS T WHERE (T.DepartmentId = @p1)" [
             {Name="@p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
         ] (employeeSelect 0)
-    [<Test>]
+    [<Fact>]
     let ``where option none``() =
         let q = fun (employees : IQueryable<Employee>) -> 
             query {
@@ -545,7 +545,7 @@ module QueryGenTest =
             {Name="@p1"; Value=System.DBNull.Value; DbType = System.Data.SqlDbType.Int}
         ] (employeeSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where string contains``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -558,7 +558,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where string startswith``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -571,7 +571,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where string endswith``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -584,7 +584,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where subquery contains id ``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -599,7 +599,7 @@ module QueryGenTest =
         
         AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2))" [] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where subquery with where contains id ``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -617,7 +617,7 @@ module QueryGenTest =
             {Name="@p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``where subquery with where contains variable id``() =
 
         let departmentId = ref 1234
@@ -637,7 +637,7 @@ module QueryGenTest =
             {Name="@p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
         ] (personSelect(0))
 
-    [<Test>]
+    [<Fact>]
     let ``select partial``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -647,7 +647,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT T.PersonName FROM Person AS T" [] (stringSelect 0 Many)
 
-    [<Test>]
+    [<Fact>]
     let ``partial select with where``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -660,8 +660,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (stringSelect 0 Many)
 
-    [<Test>]
-    [<Ignore("Bug in fsharp compiler")>]
+    [<Fact(Skip="Not implemented")>]
     let ``select partial tuple``() =
         ignore()
         //This is broken in the fsharp compiler.
@@ -675,7 +674,7 @@ module QueryGenTest =
 //        
 //        AreEqualExpression q "SELECT T.PersonName, T.PersonId FROM Person AS T" [] 
 
-    [<Test>]
+    [<Fact>]
     let ``count``() =
         
         let q = fun (persons : IQueryable<Person>) -> 
@@ -686,7 +685,7 @@ module QueryGenTest =
 
         AreEqualExpression q "SELECT COUNT(*) FROM Person AS T" [] (simpleOneSelect typedefof<int> 0)
 
-    [<Test>]
+    [<Fact>]
     let ``count where``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -699,7 +698,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (simpleOneSelect typedefof<int> 0)
 
-    [<Test>]
+    [<Fact>]
     let ``exists``() =
         
         let q = fun (persons : IQueryable<Person>) -> 
@@ -712,7 +711,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (simpleOneSelect typedefof<bool> 0)
 
-    [<Test>]
+    [<Fact>]
     let ``contains col``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -725,8 +724,7 @@ module QueryGenTest =
             {Name="@p1"; Value=11; DbType = System.Data.SqlDbType.Int}
         ] (simpleOneSelect typedefof<bool> 0)
 
-    [<Test>]
-    [<Ignore("Not implemented")>]
+    [<Fact(Skip="Not implemented")>]
     let ``contains whole``() =
         let e = {
             PersonName = "john"
@@ -755,7 +753,7 @@ module QueryGenTest =
             {Name="@p4"; Value=10; DbType = System.Data.SqlDbType.Int}
         ] (simpleOneSelect typedefof<bool> 0)
 
-    [<Test>]
+    [<Fact>]
     let ``contains where``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -770,7 +768,7 @@ module QueryGenTest =
             {Name="@p2"; Value=11; DbType = System.Data.SqlDbType.Int}
         ] (simpleOneSelect typedefof<bool> 0)
 
-    [<Test>]
+    [<Fact>]
     let ``last throws``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -781,9 +779,9 @@ module QueryGenTest =
         let e = getExpression q
         let exc = Assert.Throws(fun () -> 
             QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.SelectQuery None None None e |> ignore)
-        Assert.AreEqual(exc.Message, "'last' operator has no translations for Sql Server")
+        Assert.Equal(exc.Message, "'last' operator has no translations for Sql Server")
 
-    [<Test>]
+    [<Fact>]
     let ``lastOrDefault``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -794,9 +792,9 @@ module QueryGenTest =
         let e = getExpression q
         let exc = Assert.Throws(fun () -> 
             QueryTranslator.translate QueryTranslator.SqlServer2012 QueryTranslator.SelectQuery None None None e |> ignore)
-        Assert.AreEqual(exc.Message, "'lastOrDefault' operator has no translations for Sql Server")
+        Assert.Equal(exc.Message, "'lastOrDefault' operator has no translations for Sql Server")
 
-    [<Test>]
+    [<Fact>]
     let ``exactlyOne``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -806,7 +804,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType Single 0)
 
-    [<Test>]
+    [<Fact>]
     let ``select exactlyOne partial``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -817,7 +815,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 2 T.PersonId FROM Person AS T" [] (intSelect 0 Single)
 
-    [<Test>]
+    [<Fact>]
     let ``exactlyOne where``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -830,7 +828,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelectType Single 0)
 
-    [<Test>]
+    [<Fact>]
     let ``exactlyOneOrDefault``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -840,7 +838,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType SingleOrDefault 0)
 
-    [<Test>]
+    [<Fact>]
     let ``select exactlyOneOrDefault partial``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -851,7 +849,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 2 T.PersonId FROM Person AS T" [] (intSelect 0 SingleOrDefault)
 
-    [<Test>]
+    [<Fact>]
     let ``exactlyOneOrDefault where``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -864,7 +862,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelectType SingleOrDefault 0)
 
-    [<Test>]
+    [<Fact>]
     let ``head``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -874,7 +872,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType Single 0)
 
-    [<Test>]
+    [<Fact>]
     let ``head where``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -887,7 +885,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelectType Single 0)
 
-    [<Test>]
+    [<Fact>]
     let ``headOrDefault``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -897,7 +895,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType SingleOrDefault 0)
 
-    [<Test>]
+    [<Fact>]
     let ``headOrDefault where``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -910,7 +908,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelectType Single 0)
 
-    [<Test>]
+    [<Fact>]
     let ``minBy``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -920,7 +918,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T ORDER BY T.PersonId ASC" [] (intSelect 0 Single)
     
-    [<Test>]
+    [<Fact>]
     let ``minBy where``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -933,7 +931,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (intSelect 0 Single)
 
-    [<Test>]
+    [<Fact>]
     let ``maxBy``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -943,7 +941,7 @@ module QueryGenTest =
         
         AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T ORDER BY T.PersonId DESC" [] (intSelect 0 Single)
     
-    [<Test>]
+    [<Fact>]
     let ``maxBy where``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -956,8 +954,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (intSelect 0 Single)
 
-    [<Test>]
-    [<Ignore("Not implemented")>]
+    [<Fact(Skip="Not implemented")>]
     let ``groupBy select count``() =
         ignore()
 //        let q = fun () -> 
@@ -969,8 +966,7 @@ module QueryGenTest =
 //
 //        AreEqualExpression q "SELECT T.PersonId, COUNT(*) FROM Person AS T GROUP BY T.PersonId" [] []
 
-    [<Test>]
-    [<Ignore("Not implemented")>]
+    [<Fact(Skip="Not implemented")>]
     let ``select groupBy``() =
         ignore()
 //        let q = fun () -> 
@@ -983,8 +979,7 @@ module QueryGenTest =
 //        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] []
         //the group by must be done clientside
 
-    [<Test>]
-    [<Ignore("Not implemented")>]
+    [<Fact(Skip="Not implemented")>]
     let ``select groupBy where``() =
         ignore()
 //        let q = fun () -> 
@@ -1000,7 +995,7 @@ module QueryGenTest =
 //        ] []
         //the group by must be done clientside
 
-    [<Test>]
+    [<Fact>]
     let ``sortBy``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -1010,7 +1005,7 @@ module QueryGenTest =
             
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T ORDER BY T.PersonId ASC" [] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``sortBy thenBy``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -1021,7 +1016,7 @@ module QueryGenTest =
             
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T ORDER BY T.PersonId ASC, T.PersonName ASC" [] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``sortBy thenByDescending``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -1032,7 +1027,7 @@ module QueryGenTest =
             
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T ORDER BY T.PersonId ASC, T.PersonName DESC" [] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``sortBy where``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -1045,7 +1040,7 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``sortByDescending``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -1055,7 +1050,7 @@ module QueryGenTest =
             
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T ORDER BY T.PersonId DESC" [] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``sortByDescending thenBy``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -1066,7 +1061,7 @@ module QueryGenTest =
             
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T ORDER BY T.PersonId DESC, T.PersonName ASC" [] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``sortByDescending thenByDescending``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {
@@ -1077,7 +1072,7 @@ module QueryGenTest =
             
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T ORDER BY T.PersonId DESC, T.PersonName DESC" [] (personSelect 0)
 
-    [<Test>]
+    [<Fact>]
     let ``sortByDescending where``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {

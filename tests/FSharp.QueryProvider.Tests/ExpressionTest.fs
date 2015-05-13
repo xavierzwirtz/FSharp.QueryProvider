@@ -4,9 +4,8 @@ open System.Linq.Expressions
 
 open FSharp.QueryProvider.ExpressionMatching
 open FSharp.QueryProvider.Expression
-open NUnit.Framework
 
-[<Test>]
+[<Fact>]
 let ``visit`` () =
     let source = Expression.Add(Expression.Constant(2), Expression.Constant(2))
     
@@ -20,9 +19,9 @@ let ``visit`` () =
     
     let expected = Expression.Add(Expression.Variable(typedefof<int>, "foo"), Expression.Variable(typedefof<int>, "foo"))
     
-    Assert.AreEqual(expected.ToString(), actual.ToString())
+    Assert.Equal(expected.ToString(), actual.ToString())
 
-[<Test>]
+[<Fact>]
 let ``map``() =
     let source = Expression.Add(Expression.Constant(2), Expression.Constant(2))
     ignore()
@@ -30,9 +29,9 @@ let ``map``() =
     let result = 
         map(fun e -> Recurse, e.NodeType.ToString() ) source
         |> String.concat(",")
-    Assert.AreEqual("Constant,Constant,Add", result)
+    Assert.Equal("Constant,Constant,Add", result)
 
-//[<Test>]
+//[<Fact>]
 //let ``partialEvaluate``() =
 //    let localVal =  "local"
 //    let x = 
@@ -50,4 +49,4 @@ let ``map``() =
 //    let result = 
 //        map(fun e -> Recurse, e.NodeType.ToString() ) source
 //        |> String.concat(",")
-//    Assert.AreEqual("Constant,Constant,Add", result)
+//    Assert.Equal("Constant,Constant,Add", result)
