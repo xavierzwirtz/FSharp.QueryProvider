@@ -38,7 +38,16 @@ let queryProvider =
     DBQueryProvider (
         (fun () -> new SqlClient.SqlConnection(connectionString)), 
         (fun connection expression ->
-            let command, ctor = translateToCommand QueryDialect.SqlServer2012 SelectQuery None None None connection expression
+            let command, ctor = 
+                translateToCommand 
+                    QueryDialect.SqlServer2012 
+                    SelectQuery 
+                    None 
+                    None 
+                    None 
+                    connection 
+                    expression
+
             let ctor =
                 match ctor with
                 | Some ctor -> ctor
