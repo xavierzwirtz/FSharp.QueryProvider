@@ -6,6 +6,11 @@ open FSharp.QueryProvider.DataReader
 open Models
 open LocalDataReader
 
+type UnionEnum =
+| One = 0
+| Two = 1
+| Three = 2
+
 type VerboseRecord = {
     String : string
     Bool : bool
@@ -19,6 +24,7 @@ type VerboseRecord = {
     Int16 : int16
     Int32 : int32
     Int64 : int64
+    UnionEnum : UnionEnum
 }
 
 type Name = {
@@ -80,7 +86,7 @@ let ctorVerboseRecord returnType =
         Type = typedefof<VerboseRecord>
         TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
             Type = typedefof<VerboseRecord>
-            ConstructorArgs = [0..11] |> Seq.map(fun i -> Value i)
+            ConstructorArgs = [0..12] |> Seq.map(fun i -> Value i)
             PropertySets = []
         }
     }
@@ -157,6 +163,11 @@ let ``one int64``() =
     let reader = new LocalDataReader([[5L]])
     let result = (read reader (ctorOneSimple typedefof<int64>)) :?> int64
     Assert.Equal(5L, result)
+[<Fact>]
+let ``one UnionEnum``() =
+    let reader = new LocalDataReader([[1]])
+    let result = (read reader (ctorOneSimple typedefof<UnionEnum>)) :?> UnionEnum
+    Assert.Equal(UnionEnum.Two, result)
 
 //no need to test the many for every type
 [<Fact>]
@@ -185,6 +196,7 @@ let ``one verbose record``() =
                 2s
                 3
                 4L
+                0
             ]]
         )
 
@@ -202,6 +214,7 @@ let ``one verbose record``() =
         Int16 = 2s
         Int32 = 3
         Int64 = 4L
+        UnionEnum = UnionEnum.One
     }
 
     Assert.Equal(e, result)
@@ -226,6 +239,7 @@ let ``many verbose record``() =
                 2s
                 3
                 4L
+                1
             ]; [
                 "foobar2"
                 false
@@ -239,6 +253,7 @@ let ``many verbose record``() =
                 3s
                 4
                 5L
+                2
             ]]
         )
 
@@ -257,6 +272,7 @@ let ``many verbose record``() =
             Int16 = 2s
             Int32 = 3
             Int64 = 4L
+            UnionEnum = UnionEnum.Two
         }; {
             String = "foobar2"
             Bool = false
@@ -270,6 +286,7 @@ let ``many verbose record``() =
             Int16 = 3s
             Int32 = 4
             Int64 = 5L
+            UnionEnum = UnionEnum.Three
         }
     ]
 

@@ -92,6 +92,8 @@ and constructType reader typeCtor =
         t = typedefof<int32> ||
         t = typedefof<int64> then
         getValue (getSingleIndex())
+    else if t.IsEnum then
+        getValue (getSingleIndex())
     else if isOption t then
         let i = getSingleIndex()
         if reader.IsDBNull(i) then
