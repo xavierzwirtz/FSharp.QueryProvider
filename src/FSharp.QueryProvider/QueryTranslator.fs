@@ -104,6 +104,7 @@ module QueryTranslator =
             ReturnType = returnType
             Type = typeCtor.Type
             TypeOrLambda = TypeOrLambdaConstructionInfo.Type typeCtor
+            PostProcess = None
         }
 
     //terible duplication of code between this and createTypeSelect. needs to be refactored.
@@ -140,6 +141,22 @@ module QueryTranslator =
         else
             failwith "not implemented, only records are currently implemented"
 
+    let private groupByMethodInfo = lazy (
+        typedefof<System.Linq.Enumerable>.GetMethods()
+        |> Seq.filter(fun mi -> mi.Name = "GroupBy") 
+        |> Seq.filter(fun mi -> 
+            let args = mi.GetParameters()
+            if args.Length <> 2 then
+                false
+            else
+                let first = args |> Seq.head
+                let second = args |> Seq.last
+                let firstEqual = (first.ParameterType.GetGenericTypeDefinition() = typedefof<System.Collections.Generic.IEnumerable<_>>)
+                let secondEqual = (second.ParameterType.GetGenericTypeDefinition() = typedefof<System.Func<_, _>>)
+                firstEqual && secondEqual
+        ) 
+        |> Seq.exactlyOne
+    )
     /// <summary>
     /// Takes a Linq.Expression tree and produces a sql query and DataReader.ConstructionInfo to construct the resulting data.
     /// </summary>
@@ -237,6 +254,7 @@ module QueryTranslator =
                         let max, ml = getMethod "Max" ml
                         let min, ml = getMethod "Min" ml
                         let any, ml = getMethod "Any" ml
+                        let groupBy, ml = getMethod "GroupBy" ml
                         
                         let wheres = 
                             match any with 
@@ -285,13 +303,14 @@ module QueryTranslator =
                             let q, p, ctor = createTypeSelect t
                             let ctor = 
                                 match ctor with
-                                | None -> []
+                                | None -> None
                                 | Some ctor -> 
-                                    [{
+                                    Some {
                                         ReturnType = (getReturnType())
                                         Type = ctor.Type
                                         TypeOrLambda = TypeOrLambdaConstructionInfo.Type ctor
-                                    }]
+                                        PostProcess = None
+                                    }
                             q, p, ctor
                         let selectOrDelete, selectParameters, selectCtor =
                             if context.TopQuery && queryType = DeleteQuery then
@@ -300,18 +319,18 @@ module QueryTranslator =
                                 let selectColumn, selectParameters, selectCtor = 
                                     match count with
                                     | Some _-> 
-                                        ["COUNT(*) "], [], [createConstructionInfoForType 0 typedefof<int> Single]
+                                        ["COUNT(*) "], [], (Some (createConstructionInfoForType 0 typedefof<int> Single))
                                     | None -> 
                                         if contains.IsSome || any.IsSome then
-                                            ["CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END "], [] , [createConstructionInfoForType 0 typedefof<bool> Single]
+                                            ["CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END "], [] , (Some (createConstructionInfoForType 0 typedefof<bool> Single))
                                         else
                                             let partialSelect (l : LambdaExpression) =
                                                 let t = l.ReturnType
                                                 let c = 
                                                     if context.TopQuery then
-                                                        [createConstructionInfoForType 0 t (getReturnType())]
+                                                        Some (createConstructionInfoForType 0 t (getReturnType()))
                                                     else
-                                                        []
+                                                        None
                                                 let q, p, _ = (l.Body |> map) 
                                                 q @ [" "], p, c
                                             match maxOrMin with 
@@ -380,9 +399,10 @@ module QueryTranslator =
                                                                 Type = l.ReturnType
                                                                 ReturnType = getReturnType()
                                                                 TypeOrLambda = TypeOrLambdaConstructionInfo.Lambda lambdaCtor
+                                                                PostProcess = None
                                                             }
 
-                                                            selectQuery, selectParams, [ctor]
+                                                            selectQuery, selectParams, Some ctor
                                                         | _ -> failwith "not implemented lambda body"
                                                 | None -> 
                                                     createFullTypeSelect (Queryable.TypeSystem.getElementType (queryable.GetType()))
@@ -402,6 +422,31 @@ module QueryTranslator =
                                     match count with
                                     | Some i -> ["TOP "; i.ToString(); " "]
                                     | None -> []
+
+                                let selectCtor = 
+                                    match selectCtor with
+                                    | Some selectCtor ->
+                                        let constructed =
+                                            match groupBy with 
+                                            | Some groupBy ->
+                                                if not context.TopQuery then
+                                                    failwith "Grouping only supported on top query" //would be possible to support, not doing for now though
+                                                let selector = getLambda groupBy
+                                                
+                                                let sourceType = typedefof<System.Collections.Generic.IEnumerable<_>>.MakeGenericType(selectCtor.Type)
+                                                let oldArgs = groupBy.Method.GetGenericArguments()
+                                                let constructedGroupBy = groupByMethodInfo.Value.MakeGenericMethod(oldArgs |> Seq.head, oldArgs |> Seq.last)
+                                                let source = Expression.Parameter(sourceType)
+                                                let body = Expression.Call(constructedGroupBy, source, selector)
+                                                let lambda = Expression.Lambda(body, [source])
+
+                                                { selectCtor with 
+                                                    PostProcess = Some lambda
+                                                }
+                                            | None -> selectCtor
+                                        [constructed]
+                                    | None -> []
+
                                 ["SELECT " ] @ topStatement @ selectColumn, selectParameters, selectCtor
 
                         let mainStatement = selectOrDelete @ ["FROM "; getTableName(queryable.ElementType); " AS "; ] @ tableAlias

@@ -7,31 +7,32 @@ type ReturnType =
 | Single
 | SingleOrDefault
 | Many
-// | Group of GroupExpression
+
+type TypeOrLambdaConstructionInfo = 
+| Type of TypeConstructionInfo
+| Lambda of LambdaConstructionInfo
+
+and TypeOrValueOrLambdaConstructionInfo = 
+| Type of TypeConstructionInfo
+| Value of int
+| Lambda of LambdaConstructionInfo
+
+and TypeConstructionInfo = {
+    Type : System.Type
+    ConstructorArgs : TypeOrValueOrLambdaConstructionInfo seq
+    PropertySets : (TypeOrValueOrLambdaConstructionInfo * System.Reflection.PropertyInfo) seq
+}
+
+and LambdaConstructionInfo = {
+    Lambda : System.Linq.Expressions.LambdaExpression
+    Parameters : TypeOrValueOrLambdaConstructionInfo seq
+}
 
 type ConstructionInfo = {
     ReturnType : ReturnType
     Type : System.Type
     TypeOrLambda : TypeOrLambdaConstructionInfo
-}
-
-and TypeOrLambdaConstructionInfo = 
-| Type of TypeConstructionInfo
-| Lambda of LambdaConstructionInfo
-
-and TypeOrValueConstructionInfo = 
-| Type of TypeConstructionInfo
-| Value of int
-
-and TypeConstructionInfo = {
-    Type : System.Type
-    ConstructorArgs : TypeOrValueConstructionInfo seq
-    PropertySets : (TypeOrValueConstructionInfo * System.Reflection.PropertyInfo) seq
-}
-
-and LambdaConstructionInfo = {
-    Lambda : System.Linq.Expressions.LambdaExpression
-    Parameters : TypeOrValueConstructionInfo seq
+    PostProcess : System.Linq.Expressions.LambdaExpression option
 }
 
 let createTypeConstructionInfo t constructorArgs propertySets =
@@ -50,22 +51,27 @@ let isOption (t : System.Type) =
 let rec constructResult (reader : System.Data.IDataReader) (ctor : ConstructionInfo) : obj =
     
     match ctor.TypeOrLambda with
-    | TypeOrLambdaConstructionInfo.Lambda l ->  
-        let paramValues = 
-            l.Parameters 
-            |> Seq.map(fun p -> 
-                match p with
-                | Type typeCtor -> constructType reader typeCtor
-                | Value i -> reader.GetValue i
-            )
-        l.Lambda.Compile().DynamicInvoke(paramValues |> Seq.toArray)
+    | TypeOrLambdaConstructionInfo.Lambda lambdaCtor ->  
+        invokeLambda reader lambdaCtor
     | TypeOrLambdaConstructionInfo.Type typeCtor ->
         constructType reader typeCtor
+
+and invokeLambda reader lambdaCtor = 
+    let paramValues = 
+        lambdaCtor.Parameters 
+        |> Seq.map(fun p -> 
+            match p with
+            | TypeOrValueOrLambdaConstructionInfo.Type typeCtor -> constructType reader typeCtor
+            | TypeOrValueOrLambdaConstructionInfo.Lambda lambdaCtor -> invokeLambda reader lambdaCtor
+            | TypeOrValueOrLambdaConstructionInfo.Value i -> reader.GetValue i
+        )
+    lambdaCtor.Lambda.Compile().DynamicInvoke(paramValues |> Seq.toArray)
 
 and constructType reader typeCtor = 
     let getSingleIndex() = 
         match typeCtor.ConstructorArgs |> Seq.exactlyOne with
         | Type _ -> failwith "Shouldnt be Type"
+        | Lambda _ -> failwith "Shouldnt be Lambda"
         | Value i -> i
 
     let getValue i = 
@@ -110,6 +116,7 @@ and constructType reader typeCtor =
             |> Seq.map(fun arg -> 
                 match arg with 
                 | Type t -> constructType reader t
+                | Lambda l -> invokeLambda reader l
                 | Value i -> getValue i
             )
 
@@ -124,15 +131,46 @@ and constructType reader typeCtor =
         
         inst
 
+//let constructResults (reader : System.Data.IDataReader) (constructionInfo : ConstructionInfo) = 
+//    Seq.empty<obj>
+//    match constructionInfo.TypeOrLambda with
+//    | Lambda lCtor -> lCtor.
+//    
+////    match returnType with
+////    | Many -> 
+////        let listT = typedefof<System.Collections.Generic.List<_>>
+////        let conListT = listT.MakeGenericType([| t |])
+////        let addM = conListT.GetMethods() |> Seq.find(fun m -> m.Name = "Add")
+////        let inst = System.Activator.CreateInstance(conListT)
+////        while reader.Read() do
+////            let res = constructResult()
+////            addM.Invoke(inst, [|res|]) |> ignore
+////        inst
+////    | Single | SingleOrDefault ->
+////        if reader.Read() then
+////            let r = constructResult()
+////            if reader.Read() then
+////                raise (System.InvalidOperationException "Sequence contains more than one element")
+////            r
+////        else
+////            match returnType with
+////            | Single -> raise (System.InvalidOperationException "Sequence contains no elements")
+////            | SingleOrDefault -> 
+////                if isValueType t then
+////                    System.Activator.CreateInstance(t)
+////                else
+////                    null
+////            | _ -> failwith "shouldnt be here"
+let private moreThanOneMessage = "Sequence contains more than one element"
+let private noElementsMessage = "Sequence contains no elements"
+
 let read (reader : System.Data.IDataReader) constructionInfo : obj = 
     let constructResult () = 
         constructResult reader constructionInfo
          
     let returnType = constructionInfo.ReturnType
     let t = constructionInfo.Type
-    
-    match returnType with
-    | Many -> 
+    let getAll() = 
         let listT = typedefof<System.Collections.Generic.List<_>>
         let conListT = listT.MakeGenericType([| t |])
         let addM = conListT.GetMethods() |> Seq.find(fun m -> m.Name = "Add")
@@ -141,18 +179,27 @@ let read (reader : System.Data.IDataReader) constructionInfo : obj =
             let res = constructResult()
             addM.Invoke(inst, [|res|]) |> ignore
         inst
+    match returnType with
+    | Many -> 
+        let inst = getAll()
+        match constructionInfo.PostProcess with
+        | Some postProcess -> postProcess.Compile().DynamicInvoke([|inst|])
+        | None -> inst
     | Single | SingleOrDefault ->
-        if reader.Read() then
-            let r = constructResult()
+        match constructionInfo.PostProcess with
+        | Some postProcess -> postProcess.Compile().DynamicInvoke([|getAll()|])
+        | None ->
             if reader.Read() then
-                raise (System.InvalidOperationException "Sequence contains more than one element")
-            r
-        else
-            match returnType with
-            | Single -> raise (System.InvalidOperationException "Sequence contains no elements")
-            | SingleOrDefault -> 
-                if isValueType t then
-                    System.Activator.CreateInstance(t)
-                else
-                    null
-            | _ -> failwith "shouldnt be here"
+                let r = constructResult()
+                if reader.Read() then
+                    raise (System.InvalidOperationException moreThanOneMessage)
+                r
+            else
+                match returnType with
+                | Single -> raise (System.InvalidOperationException noElementsMessage)
+                | SingleOrDefault -> 
+                    if isValueType t then
+                        System.Activator.CreateInstance(t)
+                    else
+                        null
+                | _ -> failwith "shouldnt be here"

@@ -53,6 +53,7 @@
     <Compile Include="Queryable.fs" />
     <Compile Include="ExpressionMatching.fs" />
     <Compile Include="Expression.fs" />
+    <Compile Include="LinqTypes.fs" />
     <Compile Include="QueryTranslatorUtilities.fs" />
     <Compile Include="QueryTranslator.fs" />
     <None Include="paket.references" />

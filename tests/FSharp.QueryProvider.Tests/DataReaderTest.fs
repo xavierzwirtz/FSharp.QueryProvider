@@ -35,6 +35,11 @@ type OptionName = {
     OptionValue : string option
 }
 
+type KeyValuePair = {
+    Key : string
+    KeyValue : string
+}
+
 let ctorOneSimple t = 
     {
         ReturnType = Single
@@ -44,6 +49,7 @@ let ctorOneSimple t =
             ConstructorArgs = [Value 0]
             PropertySets = []
         }
+        PostProcess = None
     }
 
 let ctorManySimple t = 
@@ -55,6 +61,7 @@ let ctorManySimple t =
             ConstructorArgs = [Value 0]
             PropertySets = []
         }
+        PostProcess = None
     }
 
 let ctorName returnType =
@@ -66,6 +73,7 @@ let ctorName returnType =
             ConstructorArgs = [Value 0]
             PropertySets = []
         }
+        PostProcess = None
     }
 
 let ctorOptionName =
@@ -78,7 +86,13 @@ let ctorOptionNameFull returnType =
         ReturnType = returnType
         Type = typedefof<OptionName>
         TypeOrLambda = TypeOrLambdaConstructionInfo.Type ctorOptionName
+        PostProcess = None
     }
+
+let ctorKeyValuePair =
+    createTypeConstructionInfo typedefof<OptionName> [
+        Value 0; Value 1
+    ] []
 
 let ctorVerboseRecord returnType = 
     {
@@ -89,6 +103,7 @@ let ctorVerboseRecord returnType =
             ConstructorArgs = [0..12] |> Seq.map(fun i -> Value i)
             PropertySets = []
         }
+        PostProcess = None
     }
 
 [<Fact>]
@@ -397,10 +412,11 @@ let ``lambda int add``() =
         {
             ReturnType = Single
             Type = typedefof<int>
-            TypeOrLambda = Lambda {
+            TypeOrLambda = TypeOrLambdaConstructionInfo.Lambda {
                 Lambda = lambda
                 Parameters = [Value 0; Value 1]
             }
+            PostProcess = None
         }
         
     let result = (read reader ctor) :?> int
@@ -414,22 +430,69 @@ let ``lambda string mod``() =
         new LocalDataReader([["foo"]])
 
     let lambda = toLambda <@ fun f -> f + "bar"@> 
-//    let body = Expression.Call(null, String.con)
-//    let lambda = Expression.Lambda(body, [p])
 
     let ctor = 
         {
             ReturnType = Single
             Type = typedefof<string>
-            TypeOrLambda = Lambda {
+            TypeOrLambda = TypeOrLambdaConstructionInfo.Lambda {
                 Lambda = lambda
                 Parameters = [Value 0]
             }
+            PostProcess = None
         }
 
     let result = (read reader ctor) :?> string
 
     Assert.Equal("foobar", result)
+
+[<Fact>]
+let ``lambda post process single``() =
+
+    let reader = 
+        new LocalDataReader([["foo"]; ["bar"]; ["baz"]])
+
+    let lambda = toLambda <@ fun (vals : string seq) -> vals |> String.concat(" ") @> 
+
+    let ctor = 
+        {
+            ReturnType = Single
+            Type = typedefof<string>
+            TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
+                Type = typedefof<string>
+                ConstructorArgs = [Value 0]
+                PropertySets = []
+            }
+            PostProcess = Some lambda
+        }
+
+    let result = (read reader ctor) :?> string
+
+    Assert.Equal("foo bar baz", result)
+
+[<Fact>]
+let ``lambda post process many``() =
+
+    let reader = 
+        new LocalDataReader([["foo"]; ["bar"]; ["baz"]])
+
+    let lambda = toLambda <@ fun (vals : string seq) -> [vals |> String.concat(" "); vals |> String.concat(" ")] @> 
+
+    let ctor = 
+        {
+            ReturnType = Many
+            Type = typedefof<string>
+            TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
+                Type = typedefof<string>
+                ConstructorArgs = [Value 0]
+                PropertySets = []
+            }
+            PostProcess = Some lambda
+        }
+
+    let result = (read reader ctor) :?> string seq
+
+    areSeqEqual ["foo bar baz"; "foo bar baz"] result
 
 [<Fact>]
 let ``lambda type mod``() =
@@ -438,19 +501,65 @@ let ``lambda type mod``() =
         new LocalDataReader([["foo"]])
 
     let lambda = toLambda <@ fun ( opt : OptionName )  -> opt.OptionValue.Value + "bar"@> 
-//    let body = Expression.Call(null, String.con)
-//    let lambda = Expression.Lambda(body, [p])
 
     let ctor = 
         {
             ReturnType = Single
             Type = typedefof<string>
-            TypeOrLambda = Lambda {
+            TypeOrLambda = TypeOrLambdaConstructionInfo.Lambda {
                 Lambda = lambda
                 Parameters = [Type (ctorOptionName)]
             }
+            PostProcess = None
         }
 
     let result = (read reader ctor) :?> string
 
     Assert.Equal("foobar", result)
+
+//
+//[<Fact>]
+//let ``group``() =
+//
+////    let reader = 
+////        new LocalDataReader
+////            ([
+////                ["one"; "foo"]
+////                ["one"; "bar"]
+////                ["two"; "baz"]
+////            ])
+////
+////    let ctor = 
+////        {
+////            ReturnType = Single
+////            Type = typedefof<string>
+////            TypeOrLambda = TypeOrLambdaConstructionInfo.Type ctorKeyValuePair
+////        }
+//
+//    let raw = [
+//        { Key = "one"; KeyValue = "foo" }
+//        { Key = "one"; KeyValue = "bar" }
+//        { Key = "two"; KeyValue = "baz" }
+//    ]
+//    let result = System.Linq.Enumerable.GroupBy(raw, (fun x -> x.Key))
+//    printfn "%A" result
+//    //let result = (read reader ctor) :?> seq<System.Linq.IGrouping<string, KeyValuePair>>
+//
+//    Assert.Equal(2, result |> Seq.length)
+//    let first = result |> Seq.head
+//    let _second = result |> Seq.last
+//
+//    Assert.Equal("one", first.Key)
+//    areSeqEqual 
+//        [
+//            { Key = "one"; KeyValue = "foo" }
+//            { Key = "one"; KeyValue = "bar" }
+//        ]
+//        (first |> Seq.toList)
+//
+//    Assert.Equal("two", first.Key)
+//    areSeqEqual 
+//        [
+//            { Key = "two"; KeyValue = "baz" }
+//        ]
+//        (first |> Seq.toList)

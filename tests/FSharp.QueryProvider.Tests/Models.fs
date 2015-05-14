@@ -59,8 +59,15 @@ module Data =
         JobKind = JobKind.Manager
         VersionNo = 6
     }
+    let bobHoffman = {
+        PersonId = 3
+        PersonName = "bob hoffman"
+        JobKind = JobKind.Salesman
+        VersionNo = 7
+    }
 module DataReaderData =
     let persons : obj list list= [
         [1; "john doe"; 0; 5]
         [2; "james wilson"; 1; 6]
+        [3; "bob hoffman"; 0; 7]
     ]
