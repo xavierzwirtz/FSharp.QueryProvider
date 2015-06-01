@@ -226,12 +226,15 @@ let getOperationsAndQueryable e : option<IQueryable * MethodCallExpression list>
                     Some (q, m |> List.append([e]))
                 | None -> None
             | _ -> failwithf "not implemented nodetype '%A'" q.NodeType
-        | _ ->
-            if e.Arguments.Count = 0 then
-                if typedefof<IQueryable>.IsAssignableFrom e.Type then
-                    Some (Some (invoke(e) :?> IQueryable), [])
-                else
-                    None
+        | _x ->
+            if typedefof<IQueryable>.IsAssignableFrom e.Type then
+                let r = invoke(e) :?> IQueryable
+                let e = r.Expression
+                match e with
+                | Constant _ -> Some (Some (r), [])
+                | Call m -> 
+                    get m
+                | _a -> failwith "shouldnt get here"
             else
                 None
 

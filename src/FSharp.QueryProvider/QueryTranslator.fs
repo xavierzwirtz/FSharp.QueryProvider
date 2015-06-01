@@ -239,7 +239,6 @@ module QueryTranslator =
 
                     match linqChain with
                     | Some (queryable, ml) ->
-                        //let getMethod name = getMethod name methods
 
                         let select, ml = getMethod "Select" ml
                         let wheres, ml = getMethods ["Where"] ml
@@ -554,7 +553,12 @@ module QueryTranslator =
                         | "get_None" when (isOption m.Method.ReturnType) -> 
                             let t = m.Method.ReturnType.GetGenericArguments() |> Seq.head
                             Some (createNull (getDBType (TypeSource.Type t)))
-                        | x -> failwithf "Method '%s' is not implemented." x
+                        | x -> 
+//                            if typedefof<IQueryable>.IsAssignableFrom(m.Method.ReturnType) then
+//                                failwithf "Method '%s' is not implemented." x
+//                            else
+//                                failwithf "Method '%s' is not implemented." x
+                            failwithf "Method '%s' is not implemented." x
                 | Not n ->
                     let sql, parameters, ctor = map(n.Operand)
                     Some ([" NOT "] @ sql, parameters, ctor) 
