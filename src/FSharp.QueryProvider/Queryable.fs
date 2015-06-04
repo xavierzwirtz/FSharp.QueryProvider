@@ -89,7 +89,6 @@ type Query<'T>(provider : QueryProvider, expression : Expression option) as this
         match expression with 
         | Some e -> e.ToString()
         | None -> sprintf "value(Query<%s>)" typedefof<'T>.Name
-        //hardExpression.ToString()
 
 /// <summary>
 /// Type to remove boiler plate when implementing IQueryProvider

@@ -164,13 +164,11 @@ let rec unwrapType (t : System.Type) =
 /// <param name="value"></param>
 /// <param name="dbType"></param>
 let createParameter columnIndex value dbType = 
-    let p = {
+    {
         PreparedParameter.Name = "@p" + columnIndex.ToString()
         Value = value
         DbType = dbType
     }
-
-    [p.Name; ""], [p], List.empty<ConstructionInfo>
 
 /// <summary>
 /// Get the actual value of an object. Unwraps options and unions
@@ -196,7 +194,9 @@ let rec valueToQueryAndParam (columnIndex : int) (dbType : DBType<_>) (value : o
     match dbType with
     | Unhandled -> failwithf "Unable to determine sql data type for type '%s'" (value.GetType().Name)
     | DataType t ->
-        createParameter columnIndex value t
+        let p = (createParameter columnIndex value t)
+        [p.Name], [p], List.empty<ConstructionInfo>
+        
 
 /// <summary>
 /// Create a DbNull parameter for a type.
@@ -207,7 +207,8 @@ let createNull (columnIndex : int) (dbType : DBType<_>) =
     match dbType with
     | Unhandled -> failwith "Shouldnt ever get to this point with this value" 
     | DataType dbType ->
-        createParameter columnIndex System.DBNull.Value dbType
+        let p = createParameter columnIndex System.DBNull.Value dbType
+        [p.Name], [p], List.empty<ConstructionInfo>
 
 /// <summary>
 /// Get all operations in a LINQ chain and the queryable they are operating on.

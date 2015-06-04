@@ -4,6 +4,7 @@ open FSharp.QueryProvider
 open FSharp.QueryProvider.PreparedQuery
 open FSharp.QueryProvider.DataReader
 open FSharp.QueryProvider
+open QueryOperations
 
 open Models
 
@@ -15,6 +16,7 @@ type Expression = System.Linq.Expressions.Expression
 let provider = EmptyQueryProvider.EmptyQueryProvider()
 
 let queryable<'T>() = Queryable.Query<'T>(provider, None)
+let directSql = directSql provider
 
 let getExpression (f : IQueryable<'t> -> 'r) = 
     let beforeCount = provider.Expressions |> Seq.length 
@@ -55,7 +57,7 @@ let AreEqualTranslateExpression (translate : Expression -> PreparedStatement<_>)
 
     Assert.Equal(expectedSql, sqlQuery.Text)
 
-    areSeqEqual sqlQuery.Parameters (expectedParameters |> List.toSeq)
+    areSeqEqual (expectedParameters |> List.toSeq) sqlQuery.Parameters
 
     let ctorEqual =
         let e = expectedResultConstructionInfo
@@ -630,6 +632,32 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
 
+    [<Fact>]
+    let ``where direct sql subquery contains id ``() =
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                where(query {
+                    for e in directSql 
+                        [
+                            S "SELECT PersonID FROM Other WHERE FName = "; P "john"
+                            S " AND LName = "; NP "lname"
+                            S " AND 2ndLName = "; NP "lname"
+                        ] 
+                        [{Name="lname"; Value="doe"}] do
+                    contains p.PersonId
+                })
+                select p
+            }
+        
+        AreEqualDeleteOrSelectExpression q 
+            "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " 
+            "FROM Person AS T WHERE (T.PersonId IN (SELECT PersonID FROM Other WHERE FName = @p1 AND LName = @p2 AND 2ndLName = @p2))"
+            [
+                {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
+                {Name="@p2"; Value="doe"; DbType = System.Data.SqlDbType.NVarChar}
+            ]
+            (personSelect)
 
     [<Fact>]
     let ``where subquery with where contains id ``() =

@@ -202,9 +202,16 @@ module QueryTranslator =
 
         let columnNameUnique = ref 0
 
-        let getColumnNameIndex () = 
+        let getNextParamIndex () = 
             columnNameUnique := (!columnNameUnique + 1)
             !columnNameUnique
+
+        let createParameter value = 
+            let t = 
+                match (getDBType (TypeSource.Value value)) with
+                | Unhandled -> failwithf "Unable to determine sql data type for type '%s'" (value.GetType().Name)
+                | DataType t -> t
+            createParameter (getNextParamIndex()) value t
 
         let tableAliasIndex = ref 1
 
@@ -223,9 +230,9 @@ module QueryTranslator =
                 mapd context e
 
             let valueToQueryAndParam dbType value = 
-                valueToQueryAndParam (getColumnNameIndex()) dbType value
+                valueToQueryAndParam (getNextParamIndex()) dbType value
             let createNull dbType = 
-                createNull (getColumnNameIndex()) dbType
+                createNull (getNextParamIndex()) dbType
 
             let bin (e : BinaryExpression) (text : string) = 
                 let leftSql, leftParams, leftCtor = map(e.Left)
@@ -235,7 +242,8 @@ module QueryTranslator =
             let result : option<string list * PreparedParameter<_> list * ConstructionInfo list>= 
                 match e with
                 | Call m -> 
-                    let linqChain = getOperationsAndQueryable m
+                    let linqChain = 
+                        getOperationsAndQueryable m
 
                     match linqChain with
                     | Some (queryable, ml) ->
@@ -273,6 +281,7 @@ module QueryTranslator =
                             | Some _ -> sorts @ [m.Value], m
                             | None -> sorts, m
 
+                        let needsSelect = lazy ([count; contains; any; maxOrMin; select] |> Seq.exists(Option.isSome))
                         if ml |> Seq.length > 0 then 
                             let methodNames = (ml |> Seq.map(fun m -> sprintf "'%s'" m.Method.Name) |> String.concat(","))
                             failwithf "Methods not implemented: %s" methodNames
@@ -285,6 +294,37 @@ module QueryTranslator =
                         let tableAlias = (getTableAlias())
                         let map e = 
                             mapd {TableAlias = Some tableAlias; TopQuery = false} e
+
+                        let manualSqlQuery, (manualSqlParams : PreparedParameter<SqlDbType> list), manualSqlOverride = 
+                            match queryable with 
+                            | :? QueryOperations.ISqlQuery as sql ->  
+                                let namedParams = 
+                                    sql.Parameters |> Seq.map(fun p -> 
+                                        p.Name, lazy (createParameter p.Value)
+                                    ) |> Map.ofSeq
+                                
+                                let query, interoplatedParams = 
+                                    sql.Query |>
+                                    Seq.fold(fun (acumQ, acumP) query ->
+                                        let q, p =
+                                            match query with 
+                                            | QueryOperations.S text -> text, []
+                                            | QueryOperations.P value -> 
+                                                let p = createParameter value
+                                                p.Name, [p]
+                                            | QueryOperations.NP name -> 
+                                                let p = 
+                                                    match namedParams |> Map.tryFind name with
+                                                    | Some p -> p.Value
+                                                    | None -> failwithf "Invalid query, no such param '%s'" name
+
+                                                p.Name, []
+                                        acumQ @ [q], acumP @ p
+                                    ) ([], [])
+                                
+                                query, interoplatedParams @ (namedParams |> Map.toList |> List.map(fun (_, p) -> p.Value)), true
+                            | _ -> 
+                                [], [], false
 
                         let getReturnType () =
                             let isSome (o : option<_>) = o.IsSome
@@ -404,7 +444,14 @@ module QueryTranslator =
                                                             selectQuery, selectParams, Some ctor
                                                         | _ -> failwith "not implemented lambda body"
                                                 | None -> 
-                                                    createFullTypeSelect (Queryable.TypeSystem.getElementType (queryable.GetType()))
+                                                    if not manualSqlOverride then
+                                                        createFullTypeSelect (Queryable.TypeSystem.getElementType (queryable.GetType()))
+                                                    else
+                                                        if context.TopQuery then
+                                                            [] ,[], Some(createConstructionInfoForType 0 (Queryable.TypeSystem.getElementType (queryable.GetType())) (getReturnType()))
+                                                        else 
+                                                            [], [], None
+
                                 let topStatement = 
                                     let count = 
                                         if single.IsSome || singleOrDefault.IsSome then
@@ -446,9 +493,27 @@ module QueryTranslator =
                                         [constructed]
                                     | None -> []
 
-                                ["SELECT " ] @ topStatement @ selectColumn, selectParameters, selectCtor
+                                let frontSelect = 
+                                    if not manualSqlOverride || needsSelect.Value then
+                                        ["SELECT "]
+                                    else 
+                                        []
 
-                        let mainStatement = selectOrDelete @ ["FROM "; getTableName(queryable.ElementType); " AS "; ] @ tableAlias
+                                frontSelect @ topStatement @ selectColumn, selectParameters, selectCtor
+//
+//                                if not manualSqlOverride then
+//                                    generate()
+//                                else if [count; contains; any; maxOrMin; select] |> Seq.exists(Option.isSome) then
+//                                    generate()
+//                                else
+//                                    [], [], []
+                        let from = 
+                            if not manualSqlOverride || needsSelect.Value then
+                                ["FROM "; getTableName(queryable.ElementType); " AS "; ] @ tableAlias
+                            else 
+                                []
+
+                        let mainStatement = selectOrDelete @ from 
 
                         let whereClause, whereParameters, whereCtor =
                             let fromWhere = 
@@ -524,8 +589,8 @@ module QueryTranslator =
 
                                 [" ORDER BY "] @ colSorts, parameters, ctor
 
-                        let sql = mainStatement @ whereClause @ orderByClause
-                        let parameters = orderByParameters @ whereParameters @ selectParameters
+                        let sql =  mainStatement @ manualSqlQuery @ whereClause @ orderByClause
+                        let parameters = manualSqlParams @ orderByParameters @ whereParameters @ selectParameters
                         let ctor = orderByCtor @ whereCtor @ selectCtor
                         Some (sql, parameters, ctor)
                     | None ->
