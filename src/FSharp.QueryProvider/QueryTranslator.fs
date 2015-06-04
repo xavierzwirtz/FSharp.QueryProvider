@@ -140,6 +140,9 @@ module QueryTranslator =
             query, ctor
         else
             failwith "not implemented, only records are currently implemented"
+    
+    let private createQueryableCtorInfo queryable returnType = 
+        createConstructionInfoForType 0 (Queryable.TypeSystem.getElementType (queryable.GetType())) returnType
 
     let private groupByMethodInfo = lazy (
         typedefof<System.Linq.Enumerable>.GetMethods()
@@ -223,6 +226,36 @@ module QueryTranslator =
             tableAliasIndex := (!tableAliasIndex + 1)
             a
         
+        let generateManualSqlQuery (queryable : IQueryable) =
+            match queryable with 
+            | :? QueryOperations.ISqlQuery as sql ->  
+                let namedParams = 
+                    sql.Parameters |> Seq.map(fun p -> 
+                        p.Name, lazy (createParameter p.Value)
+                    ) |> Map.ofSeq
+                                
+                let query, interoplatedParams = 
+                    sql.Query |>
+                    Seq.fold(fun (acumQ, acumP) query ->
+                        let q, p =
+                            match query with 
+                            | QueryOperations.S text -> text, []
+                            | QueryOperations.P value -> 
+                                let p = createParameter value
+                                p.Name, [p]
+                            | QueryOperations.NP name -> 
+                                let p = 
+                                    match namedParams |> Map.tryFind name with
+                                    | Some p -> p.Value
+                                    | None -> failwithf "Invalid query, no such param '%s'" name
+
+                                p.Name, []
+                        acumQ @ [q], acumP @ p
+                    ) ([], [])
+                                
+                Some (query, interoplatedParams @ (namedParams |> Map.toList |> List.map(fun (_, p) -> p.Value)))
+            | _ ->  None
+
         let rec mapFun (context : Context) e : ExpressionResult * (string list * PreparedParameter<_> list * ConstructionInfo list) = 
             let mapd = fun context e ->
                 mapd(mapFun) context e |> splitResults
@@ -296,35 +329,9 @@ module QueryTranslator =
                             mapd {TableAlias = Some tableAlias; TopQuery = false} e
 
                         let manualSqlQuery, (manualSqlParams : PreparedParameter<SqlDbType> list), manualSqlOverride = 
-                            match queryable with 
-                            | :? QueryOperations.ISqlQuery as sql ->  
-                                let namedParams = 
-                                    sql.Parameters |> Seq.map(fun p -> 
-                                        p.Name, lazy (createParameter p.Value)
-                                    ) |> Map.ofSeq
-                                
-                                let query, interoplatedParams = 
-                                    sql.Query |>
-                                    Seq.fold(fun (acumQ, acumP) query ->
-                                        let q, p =
-                                            match query with 
-                                            | QueryOperations.S text -> text, []
-                                            | QueryOperations.P value -> 
-                                                let p = createParameter value
-                                                p.Name, [p]
-                                            | QueryOperations.NP name -> 
-                                                let p = 
-                                                    match namedParams |> Map.tryFind name with
-                                                    | Some p -> p.Value
-                                                    | None -> failwithf "Invalid query, no such param '%s'" name
-
-                                                p.Name, []
-                                        acumQ @ [q], acumP @ p
-                                    ) ([], [])
-                                
-                                query, interoplatedParams @ (namedParams |> Map.toList |> List.map(fun (_, p) -> p.Value)), true
-                            | _ -> 
-                                [], [], false
+                            match generateManualSqlQuery queryable with
+                            | Some (q, p) -> q, p, true
+                            | None -> [], [], false
 
                         let getReturnType () =
                             let isSome (o : option<_>) = o.IsSome
@@ -448,7 +455,7 @@ module QueryTranslator =
                                                         createFullTypeSelect (Queryable.TypeSystem.getElementType (queryable.GetType()))
                                                     else
                                                         if context.TopQuery then
-                                                            [] ,[], Some(createConstructionInfoForType 0 (Queryable.TypeSystem.getElementType (queryable.GetType())) (getReturnType()))
+                                                            [] ,[], Some(createQueryableCtorInfo queryable (getReturnType()))
                                                         else 
                                                             [], [], None
 
@@ -638,15 +645,19 @@ module QueryTranslator =
                 | GreaterThan e -> bin e ">"
                 | GreaterThanOrEqual e -> bin e ">="
                 | Constant c ->
-                    let q = 
+                    let queryable = 
                         match c.Value with 
                         | :? IQueryable as v -> Some v
                         | _ -> None
-                    if q <> None then
-                        failwith "This should ever get hit"
-                    else if c.Value = null then
-                        Some (["NULL"] ,[], [])
-                    else
+                    match queryable with
+                    | Some queryable ->
+                        match generateManualSqlQuery queryable with 
+                        | Some (q, p) -> 
+                            if queryType = QueryType.DeleteQuery then
+                                failwith "Delete query is invalid"
+                            Some (q, p, [createQueryableCtorInfo queryable Many])
+                        | None -> failwith "This should never get hit"
+                    | None ->
                         Some (valueToQueryAndParam (getDBType (TypeSource.Value c.Value)) c.Value)
                 | MemberAccess m ->
                     if m.Expression <> null && m.Expression.NodeType = ExpressionType.Parameter then

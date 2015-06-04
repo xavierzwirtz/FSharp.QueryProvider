@@ -16,7 +16,7 @@ type Expression = System.Linq.Expressions.Expression
 let provider = EmptyQueryProvider.EmptyQueryProvider()
 
 let queryable<'T>() = Queryable.Query<'T>(provider, None)
-let directSql = directSql provider
+let directSql<'T> = directSql<'T> provider
 
 let getExpression (f : IQueryable<'t> -> 'r) = 
     let beforeCount = provider.Expressions |> Seq.length 
@@ -206,6 +206,29 @@ module QueryGenTest =
             }
         
         AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelect)
+
+    [<Fact>]
+    let ``select direct sql``() =
+        let q = fun (_) -> 
+            directSql<Person> [ S "SELECT * FROM OtherPerson" ] []
+        
+        AreEqualExpression q 
+            "SELECT * FROM OtherPerson" []
+            (personSelect)
+
+    [<Fact>]
+    let ``select direct sql with where``() =
+        let q = fun (_) -> 
+            query {
+                for p in directSql<Person> [ S "SELECT * FROM OtherPerson AS T" ] [] do
+                where(p.PersonName = "john")
+            }
+        
+        AreEqualExpression q 
+            "SELECT * FROM OtherPerson AS T WHERE (T.PersonName = @p1)" [
+                {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
+            ] (personSelect)
+
 
     [<Fact>]
     let ``select fun invoke``() =

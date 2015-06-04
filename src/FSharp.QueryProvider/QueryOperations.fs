@@ -20,5 +20,5 @@ type SqlQuery<'T>(provider, expression, query : Sql seq, parameters : Parameter 
             member this.Query = query
             member this.Parameters = parameters
 
-let directSql provider query parameters : System.Linq.IQueryable<_> = 
-    SqlQuery (provider, None, query, parameters) :> System.Linq.IQueryable<_>
+let directSql<'T> provider query parameters : System.Linq.IQueryable<_> = 
+    SqlQuery<'T> (provider, None, query, parameters) :> System.Linq.IQueryable<_>
