@@ -79,7 +79,7 @@
         </tr>
         <tr>
           <td class="type-name">
-            <a href="fsharp-queryprovider-datareader-typeorvalueconstructioninfo.html">TypeOrValueConstructionInfo</a>
+            <a href="fsharp-queryprovider-datareader-typeorvalueorlambdaconstructioninfo.html">TypeOrValueOrLambdaConstructionInfo</a>
           </td>
           <td class="xmldoc"></td>
         </tr>
@@ -105,7 +105,7 @@
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/DataReader.fs#L50-50" class="github-link">
+            <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/DataReader.fs#L58-58" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -123,7 +123,7 @@
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/DataReader.fs#L65-65" class="github-link">
+            <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/DataReader.fs#L78-78" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -137,11 +137,11 @@
             createTypeConstructionInfo (...)
           </code>
           <div class="tip" id="3">
-            <strong>Signature:</strong> t:Type -&gt; constructorArgs:seq&lt;TypeOrValueConstructionInfo&gt; -&gt; propertySets:seq&lt;TypeOrValueConstructionInfo * PropertyInfo&gt; -&gt; TypeConstructionInfo<br />
+            <strong>Signature:</strong> t:Type -&gt; constructorArgs:seq&lt;TypeOrValueOrLambdaConstructionInfo&gt; -&gt; propertySets:seq&lt;TypeOrValueOrLambdaConstructionInfo * PropertyInfo&gt; -&gt; TypeConstructionInfo<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/DataReader.fs#L37-37" class="github-link">
+            <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/DataReader.fs#L39-39" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -152,9 +152,45 @@
         <td class="member-name">
 
           <code onmouseout="hideTip(event, '4', 4)" onmouseover="showTip(event, '4', 4)">
-            isOption t
+            invokeLambda reader lambdaCtor
           </code>
           <div class="tip" id="4">
+            <strong>Signature:</strong> reader:IDataReader -&gt; lambdaCtor:LambdaConstructionInfo -&gt; obj<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/DataReader.fs#L66-66" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '5', 5)" onmouseover="showTip(event, '5', 5)">
+            isOption t
+          </code>
+          <div class="tip" id="5">
+            <strong>Signature:</strong> t:Type -&gt; bool<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/DataReader.fs#L48-48" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '6', 6)" onmouseover="showTip(event, '6', 6)">
+            isValueType t
+          </code>
+          <div class="tip" id="6">
             <strong>Signature:</strong> t:Type -&gt; bool<br />
                       </div>
         </td>
@@ -169,15 +205,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '5', 5)" onmouseover="showTip(event, '5', 5)">
-            isValueType t
+          <code onmouseout="hideTip(event, '7', 7)" onmouseover="showTip(event, '7', 7)">
+            read reader constructionInfo
           </code>
-          <div class="tip" id="5">
-            <strong>Signature:</strong> t:Type -&gt; bool<br />
+          <div class="tip" id="7">
+            <strong>Signature:</strong> reader:IDataReader -&gt; constructionInfo:ConstructionInfo -&gt; obj<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/DataReader.fs#L44-44" class="github-link">
+            <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/DataReader.fs#L177-177" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -187,15 +223,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '6', 6)" onmouseover="showTip(event, '6', 6)">
-            read reader constructionInfo
+          <code onmouseout="hideTip(event, '8', 8)" onmouseover="showTip(event, '8', 8)">
+            sqlBoolToBool value
           </code>
-          <div class="tip" id="6">
-            <strong>Signature:</strong> reader:IDataReader -&gt; constructionInfo:ConstructionInfo -&gt; obj<br />
+          <div class="tip" id="8">
+            <strong>Signature:</strong> value:int -&gt; bool<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/DataReader.fs#L125-125" class="github-link">
+            <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/DataReader.fs#L52-52" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
