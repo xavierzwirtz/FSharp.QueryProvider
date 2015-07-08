@@ -77,7 +77,9 @@ module QueryTranslator =
                 let ctorArgs = fields |> Seq.mapi(fun i f ->
                     let selectIndex = (selectIndex + i)
                     let t = f.PropertyType
-                    if isValueType t then
+                    if t = typedefof<bool> then
+                        Bool selectIndex
+                    else if isValueType t then
                         Value selectIndex
                     else if isOption t then
                         Type {

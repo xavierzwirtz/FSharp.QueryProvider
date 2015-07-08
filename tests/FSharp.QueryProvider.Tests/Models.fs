@@ -46,6 +46,9 @@ type NoVersion =
     { Id : int
       Name : string }
 
+type BoolRecord = 
+    { Value : bool }
+
 module Data =
     let johnDoe = {
         PersonId = 1
@@ -70,4 +73,8 @@ module DataReaderData =
         [1; "john doe"; 0; 5]
         [2; "james wilson"; 1; 6]
         [3; "bob hoffman"; 0; 7]
+    ]
+    let bools : obj list list= [
+        [0]
+        [1]
     ]

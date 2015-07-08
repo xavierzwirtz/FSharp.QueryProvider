@@ -342,6 +342,18 @@ module QueryGenTest =
         areSeqEqual [func Data.johnDoe Data.johnDoe.PersonName; func Data.jamesWilson Data.jamesWilson.PersonName; func Data.bobHoffman Data.bobHoffman.PersonName] persons
 
     [<Fact>]
+    let ``select where bool``() =
+        let q = fun (bools : IQueryable<BoolRecord>) -> 
+            query {
+                for b in bools do
+                where(b.Value = true)
+            }
+        
+        let bools = AreEqualExpressionReturn q "SELECT T.Value FROM BoolRecord AS T WHERE (T.Value = @p1)" DataReaderData.bools
+        let bools = bools :?> seq<BoolRecord>
+        areSeqEqual [{ BoolRecord.Value = false }; { BoolRecord.Value = true }] bools
+
+    [<Fact>]
     let ``select some``() =
         let q = fun (persons : IQueryable<Person>) -> 
             query {

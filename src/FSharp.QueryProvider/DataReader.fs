@@ -15,6 +15,7 @@ type TypeOrLambdaConstructionInfo =
 and TypeOrValueOrLambdaConstructionInfo = 
 | Type of TypeConstructionInfo
 | Value of int
+| Bool of int
 | Lambda of LambdaConstructionInfo
 
 and TypeConstructionInfo = {
@@ -48,6 +49,12 @@ let isOption (t : System.Type) =
     t.IsGenericType &&
     t.GetGenericTypeDefinition() = typedefof<Option<_>>
 
+let sqlBoolToBool value =
+    match value with
+    | 0 -> false
+    | 1 -> true
+    | i -> failwith "%i" i
+
 let rec constructResult (reader : System.Data.IDataReader) (ctor : ConstructionInfo) : obj =
     
     match ctor.TypeOrLambda with
@@ -64,6 +71,7 @@ and invokeLambda reader lambdaCtor =
             | TypeOrValueOrLambdaConstructionInfo.Type typeCtor -> constructType reader typeCtor
             | TypeOrValueOrLambdaConstructionInfo.Lambda lambdaCtor -> invokeLambda reader lambdaCtor
             | TypeOrValueOrLambdaConstructionInfo.Value i -> reader.GetValue i
+            | TypeOrValueOrLambdaConstructionInfo.Bool i -> sqlBoolToBool ((reader.GetValue i) :?> int) :> obj
         )
     lambdaCtor.Lambda.Compile().DynamicInvoke(paramValues |> Seq.toArray)
 
@@ -72,7 +80,7 @@ and constructType reader typeCtor =
         match typeCtor.ConstructorArgs |> Seq.exactlyOne with
         | Type _ -> failwith "Shouldnt be Type"
         | Lambda _ -> failwith "Shouldnt be Lambda"
-        | Value i -> i
+        | Bool i | Value i -> i
 
     let getValue i = 
         let typeName = reader.GetDataTypeName i
@@ -85,7 +93,6 @@ and constructType reader typeCtor =
 
     let t = typeCtor.Type
     if t = typedefof<string> ||
-        t = typedefof<bool> ||
         t = typedefof<byte> ||
         t = typedefof<sbyte> ||
         t = typedefof<char> ||
@@ -98,6 +105,8 @@ and constructType reader typeCtor =
         t = typedefof<int32> ||
         t = typedefof<int64> then
         getValue (getSingleIndex())
+    else if t = typedefof<bool> then
+        getValue (getSingleIndex()) :?> int |> sqlBoolToBool :> obj
     else if t.IsEnum then
         getValue (getSingleIndex())
     else if isOption t then
@@ -117,6 +126,7 @@ and constructType reader typeCtor =
                 match arg with 
                 | Type t -> constructType reader t
                 | Lambda l -> invokeLambda reader l
+                | Bool i -> getValue (i) :?> int |> sqlBoolToBool :> obj
                 | Value i -> getValue i
             )
 
