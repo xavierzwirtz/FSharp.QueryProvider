@@ -121,7 +121,7 @@ module QueryTranslator =
 
             let query = 
                 fields 
-                |> List.map(fun  f -> tableAlias @ ["."; getColumnName f]) 
+                |> List.map(fun  f -> tableAlias @ [".["; getColumnName f; "]"]) 
                 |> List.interpolate([[", "]])
                 |> List.reduce(@)
 
@@ -518,7 +518,7 @@ module QueryTranslator =
 //                                    [], [], []
                         let from = 
                             if not manualSqlOverride || needsSelect.Value then
-                                ["FROM "; getTableName(queryable.ElementType); " AS "; ] @ tableAlias
+                                ["FROM ["; getTableName(queryable.ElementType); "] AS "; ] @ tableAlias
                             else 
                                 []
 
@@ -664,7 +664,7 @@ module QueryTranslator =
                 | MemberAccess m ->
                     if m.Expression <> null && m.Expression.NodeType = ExpressionType.Parameter then
                         match context.TableAlias with
-                        | Some tableAlias -> Some (tableAlias @ ["."; getColumnName(m.Member)], [], [])
+                        | Some tableAlias -> Some (tableAlias @ [".["; getColumnName(m.Member); "]"], [], [])
                         | None -> failwith "cannot access member without tablealias being genned"
                     else
                         match getLocalValue m with

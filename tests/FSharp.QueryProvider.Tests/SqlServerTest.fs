@@ -205,7 +205,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelect)
+        AreEqualExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" [] (personSelect)
 
     [<Fact>]
     let ``select direct sql``() =
@@ -225,7 +225,7 @@ module QueryGenTest =
             }
         
         AreEqualExpression q 
-            "SELECT * FROM OtherPerson AS T WHERE (T.PersonName = @p1)" [
+            "SELECT * FROM OtherPerson AS T WHERE (T.[PersonName] = @p1)" [
                 {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
             ] (personSelect)
 
@@ -240,7 +240,7 @@ module QueryGenTest =
                 select(func p)
             }
         
-        let persons = AreEqualExpressionReturn q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let persons = AreEqualExpressionReturn q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" DataReaderData.persons
         let persons = persons :?> seq<Person>
         areSeqEqual [func Data.johnDoe; func Data.jamesWilson; func Data.bobHoffman] persons
 
@@ -252,7 +252,7 @@ module QueryGenTest =
                 select(fun () -> p)
             }
         
-        let funcs = AreEqualExpressionReturn q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let funcs = AreEqualExpressionReturn q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" DataReaderData.persons
         let funcs = funcs :?> seq<unit -> Person>
         let persons = (funcs |> Seq.map(fun f -> f()))
         areSeqEqual [Data.johnDoe; Data.jamesWilson; Data.bobHoffman] persons
@@ -265,7 +265,7 @@ module QueryGenTest =
                 select((fun () -> p)())
             }
         
-        let persons = AreEqualExpressionReturn q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let persons = AreEqualExpressionReturn q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" DataReaderData.persons
         let persons = persons :?> seq<Person>
         areSeqEqual [Data.johnDoe; Data.jamesWilson; Data.bobHoffman] persons
 
@@ -279,7 +279,7 @@ module QueryGenTest =
                 select(func p p)
             }
         
-        let persons = AreEqualExpressionReturn q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let persons = AreEqualExpressionReturn q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" DataReaderData.persons
         let persons = persons :?> seq<Person>
         areSeqEqual [func Data.johnDoe Data.johnDoe; func Data.jamesWilson Data.jamesWilson; func Data.bobHoffman Data.bobHoffman] persons
         
@@ -294,7 +294,7 @@ module QueryGenTest =
                 select(func p m)
             }
         
-        let persons = AreEqualExpressionReturn q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let persons = AreEqualExpressionReturn q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" DataReaderData.persons
         let persons = persons :?> seq<Person>
         areSeqEqual [func Data.johnDoe m; func Data.jamesWilson m; func Data.bobHoffman m] persons
 
@@ -308,7 +308,7 @@ module QueryGenTest =
                 select(func p.PersonName)
             }
         
-        let persons = AreEqualExpressionReturn q "SELECT T.PersonName FROM Person AS T" DataReaderData.persons
+        let persons = AreEqualExpressionReturn q "SELECT T.[PersonName] FROM [Person] AS T" DataReaderData.persons
         let personNames = persons :?> seq<string>
         areSeqEqual [func Data.johnDoe.PersonName; func Data.jamesWilson.PersonName; func Data.bobHoffman.PersonName] personNames
 
@@ -322,7 +322,7 @@ module QueryGenTest =
                 select(func p)
             }
         
-        let funcs = AreEqualExpressionReturn q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let funcs = AreEqualExpressionReturn q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" DataReaderData.persons
         let funcs = funcs :?> seq<string -> Person>
         let persons = (funcs |> Seq.map(fun f -> f "mod"))
         areSeqEqual [func Data.johnDoe "mod"; func Data.jamesWilson "mod"; func Data.bobHoffman "mod"] persons
@@ -337,7 +337,7 @@ module QueryGenTest =
                 select(func p p.PersonName)
             }
         
-        let persons = AreEqualExpressionReturn q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let persons = AreEqualExpressionReturn q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" DataReaderData.persons
         let persons = persons :?> seq<Person>
         areSeqEqual [func Data.johnDoe Data.johnDoe.PersonName; func Data.jamesWilson Data.jamesWilson.PersonName; func Data.bobHoffman Data.bobHoffman.PersonName] persons
 
@@ -349,7 +349,7 @@ module QueryGenTest =
                 where(b.Value = true)
             }
         
-        let bools = AreEqualExpressionReturn q "SELECT T.Value FROM BoolRecord AS T WHERE (T.Value = @p1)" DataReaderData.bools
+        let bools = AreEqualExpressionReturn q "SELECT T.[Value] FROM [BoolRecord] AS T WHERE (T.[Value] = @p1)" DataReaderData.bools
         let bools = bools :?> seq<BoolRecord>
         areSeqEqual [{ BoolRecord.Value = false }; { BoolRecord.Value = true }] bools
 
@@ -361,7 +361,7 @@ module QueryGenTest =
                 select(Some p)
             }
         
-        let persons = AreEqualExpressionReturn q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let persons = AreEqualExpressionReturn q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" DataReaderData.persons
         let persons = persons :?> seq<Person option>
         areSeqEqual [Some Data.johnDoe; Some Data.jamesWilson; Some Data.bobHoffman] persons
 
@@ -373,7 +373,7 @@ module QueryGenTest =
                 select(Some p.PersonName)
             }
         
-        let persons = AreEqualExpressionReturn q "SELECT T.PersonName FROM Person AS T" DataReaderData.persons
+        let persons = AreEqualExpressionReturn q "SELECT T.[PersonName] FROM [Person] AS T" DataReaderData.persons
         let personNames = persons :?> seq<string option>
         areSeqEqual [Some Data.johnDoe.PersonName; Some Data.jamesWilson.PersonName; Some Data.bobHoffman.PersonName] personNames
 
@@ -386,7 +386,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T WHERE (T.[PersonName] = @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
 
@@ -408,7 +408,7 @@ module QueryGenTest =
                 else
                     None
             ))
-        AreEqualTranslateExpression translate q "SELECT T.PersonId, T.PersonNameMod, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonNameMod = @p1 AND T.JobKind = @p2)" [
+        AreEqualTranslateExpression translate q "SELECT T.[PersonId], T.[PersonNameMod], T.[JobKind], T.[VersionNo] FROM [Person] AS T WHERE (T.[PersonNameMod] = @p1 AND T.[JobKind] = @p2)" [
             {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
             {Name="@p2"; Value=(JobKind.Manager); DbType = System.Data.SqlDbType.Int}
         ] (personSelect)
@@ -436,7 +436,7 @@ module QueryGenTest =
             )) None
 
 
-        AreEqualTranslateExpression translate q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM PersonMod AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2))" [] (personSelect)
+        AreEqualTranslateExpression translate q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [PersonMod] AS T WHERE (T.[PersonId] IN (SELECT T2.[PersonId] FROM [Employee] AS T2))" [] (personSelect)
 
     [<Fact>]
     let ``where local var``() =
@@ -449,7 +449,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonName] = @p1)" [
             {Name="@p1"; Value=(!name); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
 
@@ -464,7 +464,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonName] = @p1)" [
             {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
 
@@ -480,7 +480,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonName] = @p1)" [
             {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
 
@@ -497,7 +497,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonName] = @p1)" [
             {Name="@p1"; Value=("john"); DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
 
@@ -512,7 +512,7 @@ module QueryGenTest =
                     select p
                 }
         
-            AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1)" [
+            AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonName] = @p1)" [
                 {Name="@p1"; Value=gen(); DbType = System.Data.SqlDbType.NVarChar}
             ] (personSelect)
 
@@ -529,7 +529,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1 AND T.PersonId = @p2)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonName] = @p1 AND T.[PersonId] = @p2)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
             {Name="@p2"; Value=5; DbType = System.Data.SqlDbType.Int}
         ] (personSelect)
@@ -543,7 +543,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1 OR T.PersonName = @p2)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonName] = @p1 OR T.[PersonName] = @p2)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
             {Name="@p2"; Value="doe"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
@@ -557,7 +557,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName = @p1 OR T.PersonName = @p2 OR T.PersonName = @p3)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonName] = @p1 OR T.[PersonName] = @p2 OR T.[PersonName] = @p3)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
             {Name="@p2"; Value="doe"; DbType = System.Data.SqlDbType.NVarChar}
             {Name="@p3"; Value="james"; DbType = System.Data.SqlDbType.NVarChar}
@@ -572,7 +572,7 @@ module QueryGenTest =
                 select e
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.EmployeeId, T.EmployeeName, T.DepartmentId, T.VersionNo, T.PersonId " "FROM Employee AS T WHERE (T.DepartmentId = @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[EmployeeId], T.[EmployeeName], T.[DepartmentId], T.[VersionNo], T.[PersonId] " "FROM [Employee] AS T WHERE (T.[DepartmentId] = @p1)" [
             {Name="@p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
         ] (employeeSelect 0)
     [<Fact>]
@@ -584,7 +584,7 @@ module QueryGenTest =
                 select e
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.EmployeeId, T.EmployeeName, T.DepartmentId, T.VersionNo, T.PersonId " "FROM Employee AS T WHERE (T.DepartmentId = @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[EmployeeId], T.[EmployeeName], T.[DepartmentId], T.[VersionNo], T.[PersonId] " "FROM [Employee] AS T WHERE (T.[DepartmentId] = @p1)" [
             {Name="@p1"; Value=System.DBNull.Value; DbType = System.Data.SqlDbType.Int}
         ] (employeeSelect 0)
 
@@ -597,7 +597,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName LIKE '%' + @p1 + '%')" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonName] LIKE '%' + @p1 + '%')" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
 
@@ -610,7 +610,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName LIKE @p1 + '%')" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonName] LIKE @p1 + '%')" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
 
@@ -623,7 +623,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonName LIKE '%' + @p1)" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonName] LIKE '%' + @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
 
@@ -640,7 +640,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2))" [] (personSelect)
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonId] IN (SELECT T2.[PersonId] FROM [Employee] AS T2))" [] (personSelect)
 
     [<Fact>]
     let ``where subquery from func contains id ``() =
@@ -663,7 +663,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2 WHERE (T2.EmployeeName = @p1)))" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonId] IN (SELECT T2.[PersonId] FROM [Employee] AS T2 WHERE (T2.[EmployeeName] = @p1)))" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
 
@@ -686,8 +686,8 @@ module QueryGenTest =
             }
         
         AreEqualDeleteOrSelectExpression q 
-            "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " 
-            "FROM Person AS T WHERE (T.PersonId IN (SELECT PersonID FROM Other WHERE FName = @p1 AND LName = @p2 AND 2ndLName = @p2))"
+            "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " 
+            "FROM [Person] AS T WHERE (T.[PersonId] IN (SELECT PersonID FROM Other WHERE FName = @p1 AND LName = @p2 AND 2ndLName = @p2))"
             [
                 {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
                 {Name="@p2"; Value="doe"; DbType = System.Data.SqlDbType.NVarChar}
@@ -708,7 +708,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2 WHERE (T2.DepartmentId = @p1)))" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonId] IN (SELECT T2.[PersonId] FROM [Employee] AS T2 WHERE (T2.[DepartmentId] = @p1)))" [
             {Name="@p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
         ] (personSelect)
 
@@ -728,7 +728,7 @@ module QueryGenTest =
                 select p
             }
         
-        AreEqualDeleteOrSelectExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo " "FROM Person AS T WHERE (T.PersonId IN (SELECT T2.PersonId FROM Employee AS T2 WHERE (T2.DepartmentId = @p1)))" [
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonId] IN (SELECT T2.[PersonId] FROM [Employee] AS T2 WHERE (T2.[DepartmentId] = @p1)))" [
             {Name="@p1"; Value=1234; DbType = System.Data.SqlDbType.Int}
         ] (personSelect)
 
@@ -739,7 +739,7 @@ module QueryGenTest =
                 select p.PersonName
             }
         
-        AreEqualExpression q "SELECT T.PersonName FROM Person AS T" [] (stringSelect 0 Many)
+        AreEqualExpression q "SELECT T.[PersonName] FROM [Person] AS T" [] (stringSelect 0 Many)
 
     [<Fact>]
     let ``select partial with where``() =
@@ -750,7 +750,7 @@ module QueryGenTest =
                 select p.PersonName
             }
         
-        AreEqualExpression q "SELECT T.PersonName FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualExpression q "SELECT T.[PersonName] FROM [Person] AS T WHERE (T.[PersonName] = @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (stringSelect 0 Many)
 
@@ -763,7 +763,7 @@ module QueryGenTest =
                 select p.JobKind
             }
         
-        AreEqualExpression q "SELECT T.JobKind FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualExpression q "SELECT T.[JobKind] FROM [Person] AS T WHERE (T.[PersonName] = @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (simpleSelect typedefof<JobKind> 0 Many)
 
@@ -779,7 +779,7 @@ module QueryGenTest =
 //                select (p.PersonName, p.PersonId)
 //            }
 //        
-//        AreEqualExpression q "SELECT T.PersonName, T.PersonId FROM Person AS T" [] 
+//        AreEqualExpression q "SELECT T.[PersonName], T.[PersonId] FROM [Person] AS T" [] 
 
     [<Fact>]
     let ``count``() =
@@ -790,7 +790,7 @@ module QueryGenTest =
                 count
             }
 
-        AreEqualExpression q "SELECT COUNT(*) FROM Person AS T" [] (simpleOneSelect typedefof<int> 0)
+        AreEqualExpression q "SELECT COUNT(*) FROM [Person] AS T" [] (simpleOneSelect typedefof<int> 0)
 
     [<Fact>]
     let ``count where``() =
@@ -801,7 +801,7 @@ module QueryGenTest =
                 count
             }
 
-        AreEqualExpression q "SELECT COUNT(*) FROM Person AS T WHERE (T.PersonName = @p1)"  [
+        AreEqualExpression q "SELECT COUNT(*) FROM [Person] AS T WHERE (T.[PersonName] = @p1)"  [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (simpleOneSelect typedefof<int> 0)
 
@@ -814,7 +814,7 @@ module QueryGenTest =
                 exists(p.PersonName = "john")
             }
 
-        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END FROM Person AS T WHERE (T.PersonName = @p1)"  [
+        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END FROM [Person] AS T WHERE (T.[PersonName] = @p1)"  [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (simpleOneSelect typedefof<bool> 0)
 
@@ -827,7 +827,7 @@ module QueryGenTest =
                 contains 11
             }
         
-        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END FROM Person AS T WHERE (T.PersonId = @p1)"  [
+        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END FROM [Person] AS T WHERE (T.[PersonId] = @p1)"  [
             {Name="@p1"; Value=11; DbType = System.Data.SqlDbType.Int}
         ] (simpleOneSelect typedefof<bool> 0)
 
@@ -847,11 +847,11 @@ module QueryGenTest =
             }
 
         let sql = 
-            ["SELECT CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END FROM Person AS T WHERE ("]
-            @ ["T.PersonName = @p1 AND "]
-            @ ["T.JobKind = @p2 AND "]
-            @ ["T.VersionNo = @p3 AND "]
-            @ ["T.PersonId = @p4)"]
+            ["SELECT CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END FROM [Person] AS T WHERE ("]
+            @ ["T.[PersonName] = @p1 AND "]
+            @ ["T.[JobKind] = @p2 AND "]
+            @ ["T.[VersionNo] = @p3 AND "]
+            @ ["T.[PersonId] = @p4)"]
 
         AreEqualExpression q (sql |> String.concat("")) [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
@@ -870,7 +870,7 @@ module QueryGenTest =
                 contains 11
             }
         
-        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END FROM Person AS T WHERE (T.PersonName = @p1 AND T.PersonId = @p2)" [
+        AreEqualExpression q "SELECT CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END FROM [Person] AS T WHERE (T.[PersonName] = @p1 AND T.[PersonId] = @p2)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
             {Name="@p2"; Value=11; DbType = System.Data.SqlDbType.Int}
         ] (simpleOneSelect typedefof<bool> 0)
@@ -909,7 +909,7 @@ module QueryGenTest =
                 exactlyOne
             }
         
-        AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType Single)
+        AreEqualExpression q "SELECT TOP 2 T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" [] (personSelectType Single)
 
     [<Fact>]
     let ``select exactlyOne partial``() =
@@ -920,7 +920,7 @@ module QueryGenTest =
                 exactlyOne
             }
         
-        AreEqualExpression q "SELECT TOP 2 T.PersonId FROM Person AS T" [] (intSelect 0 Single)
+        AreEqualExpression q "SELECT TOP 2 T.[PersonId] FROM [Person] AS T" [] (intSelect 0 Single)
 
     [<Fact>]
     let ``exactlyOne where``() =
@@ -931,7 +931,7 @@ module QueryGenTest =
                 exactlyOne
             }
         
-        AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualExpression q "SELECT TOP 2 T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T WHERE (T.[PersonName] = @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelectType Single)
 
@@ -943,7 +943,7 @@ module QueryGenTest =
                 exactlyOneOrDefault
             }
         
-        AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType SingleOrDefault)
+        AreEqualExpression q "SELECT TOP 2 T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" [] (personSelectType SingleOrDefault)
 
     [<Fact>]
     let ``select exactlyOneOrDefault partial``() =
@@ -954,7 +954,7 @@ module QueryGenTest =
                 exactlyOneOrDefault
             }
         
-        AreEqualExpression q "SELECT TOP 2 T.PersonId FROM Person AS T" [] (intSelect 0 SingleOrDefault)
+        AreEqualExpression q "SELECT TOP 2 T.[PersonId] FROM [Person] AS T" [] (intSelect 0 SingleOrDefault)
 
     [<Fact>]
     let ``exactlyOneOrDefault where``() =
@@ -965,7 +965,7 @@ module QueryGenTest =
                 exactlyOneOrDefault
             }
         
-        AreEqualExpression q "SELECT TOP 2 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualExpression q "SELECT TOP 2 T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T WHERE (T.[PersonName] = @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelectType SingleOrDefault)
 
@@ -977,7 +977,7 @@ module QueryGenTest =
                 head
             }
         
-        AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType Single)
+        AreEqualExpression q "SELECT TOP 1 T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" [] (personSelectType Single)
 
     [<Fact>]
     let ``head where``() =
@@ -988,7 +988,7 @@ module QueryGenTest =
                 head
             }
         
-        AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualExpression q "SELECT TOP 1 T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T WHERE (T.[PersonName] = @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelectType Single)
 
@@ -1000,7 +1000,7 @@ module QueryGenTest =
                 headOrDefault
             }
         
-        AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" [] (personSelectType SingleOrDefault)
+        AreEqualExpression q "SELECT TOP 1 T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" [] (personSelectType SingleOrDefault)
 
     [<Fact>]
     let ``headOrDefault where``() =
@@ -1011,7 +1011,7 @@ module QueryGenTest =
                 head
             }
         
-        AreEqualExpression q "SELECT TOP 1 T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1)" [
+        AreEqualExpression q "SELECT TOP 1 T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T WHERE (T.[PersonName] = @p1)" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelectType Single)
 
@@ -1023,7 +1023,7 @@ module QueryGenTest =
                 minBy p.PersonId
             }
         
-        AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T ORDER BY T.PersonId ASC" [] (intSelect 0 Single)
+        AreEqualExpression q "SELECT TOP 1 T.[PersonId] FROM [Person] AS T ORDER BY T.[PersonId] ASC" [] (intSelect 0 Single)
     
     [<Fact>]
     let ``minBy where``() =
@@ -1034,7 +1034,7 @@ module QueryGenTest =
                 minBy p.PersonId
             }
         
-        AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T WHERE (T.PersonName = @p1) ORDER BY T.PersonId ASC" [
+        AreEqualExpression q "SELECT TOP 1 T.[PersonId] FROM [Person] AS T WHERE (T.[PersonName] = @p1) ORDER BY T.[PersonId] ASC" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (intSelect 0 Single)
 
@@ -1046,7 +1046,7 @@ module QueryGenTest =
                 maxBy p.PersonId
             }
         
-        AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T ORDER BY T.PersonId DESC" [] (intSelect 0 Single)
+        AreEqualExpression q "SELECT TOP 1 T.[PersonId] FROM [Person] AS T ORDER BY T.[PersonId] DESC" [] (intSelect 0 Single)
     
     [<Fact>]
     let ``maxBy where``() =
@@ -1057,7 +1057,7 @@ module QueryGenTest =
                 maxBy p.PersonId
             }
         
-        AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T WHERE (T.PersonName = @p1) ORDER BY T.PersonId DESC" [
+        AreEqualExpression q "SELECT TOP 1 T.[PersonId] FROM [Person] AS T WHERE (T.[PersonName] = @p1) ORDER BY T.[PersonId] DESC" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (intSelect 0 Single)
 
@@ -1081,7 +1081,7 @@ module QueryGenTest =
 //                    PropertySets = []
 //                }
 //            }
-        AreEqualExpression q "SELECT TOP 1 T.PersonId FROM Person AS T WHERE (T.PersonName = @p1) ORDER BY T.PersonId DESC" [
+        AreEqualExpression q "SELECT TOP 1 T.[PersonId] FROM [Person] AS T WHERE (T.[PersonName] = @p1) ORDER BY T.[PersonId] DESC" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (intSelect 0 Single)
 
@@ -1094,7 +1094,7 @@ module QueryGenTest =
                 select g
             }
 
-        let grouped = AreEqualExpressionReturn q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T" DataReaderData.persons
+        let grouped = AreEqualExpressionReturn q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T" DataReaderData.persons
         let grouped = grouped :?> seq<IGrouping<JobKind, Person>>
 
         Assert.Equal(2, grouped |> Seq.length)
@@ -1117,7 +1117,7 @@ module QueryGenTest =
                 select g
             }
 
-        let grouped = AreEqualExpressionReturn q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.JobKind = @p1)" DataReaderData.persons
+        let grouped = AreEqualExpressionReturn q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T WHERE (T.[JobKind] = @p1)" DataReaderData.persons
         let grouped = grouped :?> seq<IGrouping<JobKind, Person>>
 
         Assert.Equal(2, grouped |> Seq.length)
@@ -1139,7 +1139,7 @@ module QueryGenTest =
                 select(g.Key)
             }
 
-        let grouped = AreEqualExpressionReturn q "SELECT T.JobKind FROM Person AS T" DataReaderData.persons
+        let grouped = AreEqualExpressionReturn q "SELECT T.[JobKind] FROM [Person] AS T" DataReaderData.persons
         let grouped = grouped :?> seq<JobKind>
 
         areSeqEqual [JobKind.Salesman; JobKind.Manager] grouped
@@ -1152,7 +1152,7 @@ module QueryGenTest =
                 sortBy p.PersonId
             }
             
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T ORDER BY T.PersonId ASC" [] (personSelect)
+        AreEqualExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T ORDER BY T.[PersonId] ASC" [] (personSelect)
 
     [<Fact>]
     let ``sortBy thenBy``() =
@@ -1163,7 +1163,7 @@ module QueryGenTest =
                 thenBy p.PersonName
             }
             
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T ORDER BY T.PersonId ASC, T.PersonName ASC" [] (personSelect)
+        AreEqualExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T ORDER BY T.[PersonId] ASC, T.[PersonName] ASC" [] (personSelect)
 
     [<Fact>]
     let ``sortBy thenByDescending``() =
@@ -1174,7 +1174,7 @@ module QueryGenTest =
                 thenByDescending p.PersonName
             }
             
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T ORDER BY T.PersonId ASC, T.PersonName DESC" [] (personSelect)
+        AreEqualExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T ORDER BY T.[PersonId] ASC, T.[PersonName] DESC" [] (personSelect)
 
     [<Fact>]
     let ``sortBy where``() =
@@ -1185,7 +1185,7 @@ module QueryGenTest =
                 where(p.PersonName = "john")
             }
             
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1) ORDER BY T.PersonId ASC" [
+        AreEqualExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T WHERE (T.[PersonName] = @p1) ORDER BY T.[PersonId] ASC" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
 
@@ -1197,7 +1197,7 @@ module QueryGenTest =
                 sortByDescending p.PersonId
             }
             
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T ORDER BY T.PersonId DESC" [] (personSelect)
+        AreEqualExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T ORDER BY T.[PersonId] DESC" [] (personSelect)
 
     [<Fact>]
     let ``sortByDescending thenBy``() =
@@ -1208,7 +1208,7 @@ module QueryGenTest =
                 thenBy p.PersonName
             }
             
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T ORDER BY T.PersonId DESC, T.PersonName ASC" [] (personSelect)
+        AreEqualExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T ORDER BY T.[PersonId] DESC, T.[PersonName] ASC" [] (personSelect)
 
     [<Fact>]
     let ``sortByDescending thenByDescending``() =
@@ -1219,7 +1219,7 @@ module QueryGenTest =
                 thenByDescending p.PersonName
             }
             
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T ORDER BY T.PersonId DESC, T.PersonName DESC" [] (personSelect)
+        AreEqualExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T ORDER BY T.[PersonId] DESC, T.[PersonName] DESC" [] (personSelect)
 
     [<Fact>]
     let ``sortByDescending where``() =
@@ -1230,7 +1230,7 @@ module QueryGenTest =
                 where(p.PersonName = "john")
             }
             
-        AreEqualExpression q "SELECT T.PersonId, T.PersonName, T.JobKind, T.VersionNo FROM Person AS T WHERE (T.PersonName = @p1) ORDER BY T.PersonId DESC" [
+        AreEqualExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [Person] AS T WHERE (T.[PersonName] = @p1) ORDER BY T.[PersonId] DESC" [
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
 
