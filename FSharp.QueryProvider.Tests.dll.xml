@@ -1,0 +1,130 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<assemblies>
+  <assembly name="C:\Projects\FSharp.QueryProvider\tests\FSharp.QueryProvider.Tests\bin\Release\FSharp.QueryProvider.Tests.DLL" environment="64-bit .NET 4.0.30319.34209 [collection-per-class, non-parallel]" test-framework="xUnit.net 2.0.0.2929" run-date="2015-07-08" run-time="19:00:03" config-file="C:\Projects\FSharp.QueryProvider\packages\xunit.runner.console\tools\xunit.console.exe.Config" total="104" passed="97" failed="0" skipped="7" time="1.996" errors="0">
+    <errors />
+    <collection total="72" passed="65" failed="0" skipped="7" name="Test collection for SqlServerTest+QueryGenTest" time="1.052">
+      <test name="SqlServerTest+QueryGenTest.lastOrDefault" type="SqlServerTest+QueryGenTest" method="lastOrDefault" time="0.3561099" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select fun two arg invoke" type="SqlServerTest+QueryGenTest" method="select fun two arg invoke" time="0.0781946" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where with two or" type="SqlServerTest+QueryGenTest" method="where with two or" time="0.0651931" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.double where" type="SqlServerTest+QueryGenTest" method="double where" time="0.0057395" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where property access" type="SqlServerTest+QueryGenTest" method="where property access" time="0.0093061" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.extend column name" type="SqlServerTest+QueryGenTest" method="extend column name" time="0.0054752" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select fun inline" type="SqlServerTest+QueryGenTest" method="select fun inline" time="0.0079522" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.head" type="SqlServerTest+QueryGenTest" method="head" time="0.0047114" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.count" type="SqlServerTest+QueryGenTest" method="count" time="0.0141219" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where subquery with where contains variable id" type="SqlServerTest+QueryGenTest" method="where subquery with where contains variable id" time="0.0757249" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select partial enum" type="SqlServerTest+QueryGenTest" method="select partial enum" time="0.0082746" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.groupBy partial, whole where" type="SqlServerTest+QueryGenTest" method="groupBy partial, whole where" time="0" result="Skip">
+        <reason><![CDATA[Not implemented.]]></reason>
+      </test>
+      <test name="SqlServerTest+QueryGenTest.select fun partial applied" type="SqlServerTest+QueryGenTest" method="select fun partial applied" time="0.0079244" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where subquery from func contains id " type="SqlServerTest+QueryGenTest" method="where subquery from func contains id " time="0.0189664" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select fun full + partial" type="SqlServerTest+QueryGenTest" method="select fun full + partial" time="0.006771" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where field access" type="SqlServerTest+QueryGenTest" method="where field access" time="0.01056" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where local var" type="SqlServerTest+QueryGenTest" method="where local var" time="0.0067928" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.maxBy" type="SqlServerTest+QueryGenTest" method="maxBy" time="0.0102106" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.exactlyOne where" type="SqlServerTest+QueryGenTest" method="exactlyOne where" time="0.0049004" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where subquery with where contains id " type="SqlServerTest+QueryGenTest" method="where subquery with where contains id " time="0.0076686" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where with single or" type="SqlServerTest+QueryGenTest" method="where with single or" time="0.0048491" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select exactlyOne partial" type="SqlServerTest+QueryGenTest" method="select exactlyOne partial" time="0.0066457" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where local function applied" type="SqlServerTest+QueryGenTest" method="where local function applied" time="0.0124228" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select direct sql with where" type="SqlServerTest+QueryGenTest" method="select direct sql with where" time="0.0256262" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.exactlyOneOrDefault" type="SqlServerTest+QueryGenTest" method="exactlyOneOrDefault" time="0.0036679" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.sortBy thenByDescending" type="SqlServerTest+QueryGenTest" method="sortBy thenByDescending" time="0.0119759" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select partial with where" type="SqlServerTest+QueryGenTest" method="select partial with where" time="0.0054752" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where string startswith" type="SqlServerTest+QueryGenTest" method="where string startswith" time="0.0120692" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where subquery contains id " type="SqlServerTest+QueryGenTest" method="where subquery contains id " time="0.0105745" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.groupBy partial, whole" type="SqlServerTest+QueryGenTest" method="groupBy partial, whole" time="0.0322146" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.exists" type="SqlServerTest+QueryGenTest" method="exists" time="0.0155148" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select exactlyOneOrDefault partial" type="SqlServerTest+QueryGenTest" method="select exactlyOneOrDefault partial" time="0.0058015" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.head where" type="SqlServerTest+QueryGenTest" method="head where" time="0.0039006" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.contains whole" type="SqlServerTest+QueryGenTest" method="contains whole" time="0" result="Skip">
+        <reason><![CDATA[Not implemented]]></reason>
+      </test>
+      <test name="SqlServerTest+QueryGenTest.where string endswith" type="SqlServerTest+QueryGenTest" method="where string endswith" time="0.0044159" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select fun self execute" type="SqlServerTest+QueryGenTest" method="select fun self execute" time="0.0070768" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.sortBy where" type="SqlServerTest+QueryGenTest" method="sortBy where" time="0.0059298" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.sortByDescending where" type="SqlServerTest+QueryGenTest" method="sortByDescending where" time="0.0048542" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.extend table name" type="SqlServerTest+QueryGenTest" method="extend table name" time="0.0068967" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select fun two local arg invoke" type="SqlServerTest+QueryGenTest" method="select fun two local arg invoke" time="0.0070404" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.sortByDescending" type="SqlServerTest+QueryGenTest" method="sortByDescending" time="0.0046597" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where option none" type="SqlServerTest+QueryGenTest" method="where option none" time="0.0087254" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select some" type="SqlServerTest+QueryGenTest" method="select some" time="0.0069442" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.groupBy partial, partial select" type="SqlServerTest+QueryGenTest" method="groupBy partial, partial select" time="0" result="Skip">
+        <reason><![CDATA[Not implemented.]]></reason>
+      </test>
+      <test name="SqlServerTest+QueryGenTest.contains col" type="SqlServerTest+QueryGenTest" method="contains col" time="0.0071683" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select where bool" type="SqlServerTest+QueryGenTest" method="select where bool" time="0.0084782" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where string contains" type="SqlServerTest+QueryGenTest" method="where string contains" time="0.0056411" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.sortByDescending thenByDescending" type="SqlServerTest+QueryGenTest" method="sortByDescending thenByDescending" time="0.0036465" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.headOrDefault" type="SqlServerTest+QueryGenTest" method="headOrDefault" time="0.0032283" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.headOrDefault where" type="SqlServerTest+QueryGenTest" method="headOrDefault where" time="0.0052793" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.exactlyOne" type="SqlServerTest+QueryGenTest" method="exactlyOne" time="0.0023974" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.last throws" type="SqlServerTest+QueryGenTest" method="last throws" time="0.0030555" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where func property access" type="SqlServerTest+QueryGenTest" method="where func property access" time="0.0059182" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where direct sql subquery contains id " type="SqlServerTest+QueryGenTest" method="where direct sql subquery contains id " time="0.0315902" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.contains where" type="SqlServerTest+QueryGenTest" method="contains where" time="0.0059366" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.minBy where" type="SqlServerTest+QueryGenTest" method="minBy where" time="0.0062805" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select partial tuple" type="SqlServerTest+QueryGenTest" method="select partial tuple" time="0" result="Skip">
+        <reason><![CDATA[Not implemented]]></reason>
+      </test>
+      <test name="SqlServerTest+QueryGenTest.select some partial" type="SqlServerTest+QueryGenTest" method="select some partial" time="0" result="Skip">
+        <reason><![CDATA[Partial selecting when lambda is applied is not supported yet.]]></reason>
+      </test>
+      <test name="SqlServerTest+QueryGenTest.select fun invoke" type="SqlServerTest+QueryGenTest" method="select fun invoke" time="0.0059991" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.maxBy where" type="SqlServerTest+QueryGenTest" method="maxBy where" time="0.0050043" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.where simple" type="SqlServerTest+QueryGenTest" method="where simple" time="0.003511" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.count where" type="SqlServerTest+QueryGenTest" method="count where" time="0.0036551" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.sortBy" type="SqlServerTest+QueryGenTest" method="sortBy" time="0.0044441" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.sortByDescending thenBy" type="SqlServerTest+QueryGenTest" method="sortByDescending thenBy" time="0.0050257" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.groupBy count, partial" type="SqlServerTest+QueryGenTest" method="groupBy count, partial" time="0" result="Skip">
+        <reason><![CDATA[Not implemented]]></reason>
+      </test>
+      <test name="SqlServerTest+QueryGenTest.select direct sql" type="SqlServerTest+QueryGenTest" method="select direct sql" time="0.0013334" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select simple" type="SqlServerTest+QueryGenTest" method="select simple" time="0.0029546" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.minBy" type="SqlServerTest+QueryGenTest" method="minBy" time="0.0025372" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.sortBy thenBy" type="SqlServerTest+QueryGenTest" method="sortBy thenBy" time="0.0038869" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.select fun partial" type="SqlServerTest+QueryGenTest" method="select fun partial" time="0" result="Skip">
+        <reason><![CDATA[Partial selecting when lambda is applied is not supported yet.]]></reason>
+      </test>
+      <test name="SqlServerTest+QueryGenTest.where option some" type="SqlServerTest+QueryGenTest" method="where option some" time="0.0080415" result="Pass" />
+      <test name="SqlServerTest+QueryGenTest.exactlyOneOrDefault where" type="SqlServerTest+QueryGenTest" method="exactlyOneOrDefault where" time="0.0052066" result="Pass" />
+    </collection>
+    <collection total="2" passed="2" failed="0" skipped="0" name="Test collection for Expression" time="0.013">
+      <test name="Expression.map" type="Expression" method="map" time="0.0051562" result="Pass" />
+      <test name="Expression.visit" type="Expression" method="visit" time="0.0081138" result="Pass" />
+    </collection>
+    <collection total="30" passed="30" failed="0" skipped="0" name="Test collection for DataReaderTest" time="0.715">
+      <test name="DataReaderTest.lambda post process single" type="DataReaderTest" method="lambda post process single" time="0.4768487" result="Pass" />
+      <test name="DataReaderTest.option none from dbnull" type="DataReaderTest" method="option none from dbnull" time="0.0377968" result="Pass" />
+      <test name="DataReaderTest.singleOrDefault record no values defaults" type="DataReaderTest" method="singleOrDefault record no values defaults" time="0.0019535" result="Pass" />
+      <test name="DataReaderTest.one verbose record" type="DataReaderTest" method="one verbose record" time="0.024454" result="Pass" />
+      <test name="DataReaderTest.one char" type="DataReaderTest" method="one char" time="0.0048089" result="Pass" />
+      <test name="DataReaderTest.lambda type mod" type="DataReaderTest" method="lambda type mod" time="0.0379199" result="Pass" />
+      <test name="DataReaderTest.option some" type="DataReaderTest" method="option some" time="0.0019013" result="Pass" />
+      <test name="DataReaderTest.one float" type="DataReaderTest" method="one float" time="0.0046113" result="Pass" />
+      <test name="DataReaderTest.lambda int add" type="DataReaderTest" method="lambda int add" time="0.0261069" result="Pass" />
+      <test name="DataReaderTest.one double" type="DataReaderTest" method="one double" time="0.0007727" result="Pass" />
+      <test name="DataReaderTest.one UnionEnum" type="DataReaderTest" method="one UnionEnum" time="0.0050061" result="Pass" />
+      <test name="DataReaderTest.one System.Guid" type="DataReaderTest" method="one System.Guid" time="0.0044971" result="Pass" />
+      <test name="DataReaderTest.one int64" type="DataReaderTest" method="one int64" time="0.0032266" result="Pass" />
+      <test name="DataReaderTest.single record multiple values throws" type="DataReaderTest" method="single record multiple values throws" time="0.0020595" result="Pass" />
+      <test name="DataReaderTest.single record no values throws" type="DataReaderTest" method="single record no values throws" time="0.0005721" result="Pass" />
+      <test name="DataReaderTest.option none from null" type="DataReaderTest" method="option none from null" time="0.0006171" result="Pass" />
+      <test name="DataReaderTest.singleOrDefault record multiple values throws" type="DataReaderTest" method="singleOrDefault record multiple values throws" time="0.0008835" result="Pass" />
+      <test name="DataReaderTest.many string" type="DataReaderTest" method="many string" time="0.0195022" result="Pass" />
+      <test name="DataReaderTest.one System.DateTime" type="DataReaderTest" method="one System.DateTime" time="0.0049731" result="Pass" />
+      <test name="DataReaderTest.one int16" type="DataReaderTest" method="one int16" time="0.0050266" result="Pass" />
+      <test name="DataReaderTest.one bool true" type="DataReaderTest" method="one bool true" time="0.0055787" result="Pass" />
+      <test name="DataReaderTest.one bool false" type="DataReaderTest" method="one bool false" time="0.0012166" result="Pass" />
+      <test name="DataReaderTest.many verbose record" type="DataReaderTest" method="many verbose record" time="0.0079415" result="Pass" />
+      <test name="DataReaderTest.lambda string mod" type="DataReaderTest" method="lambda string mod" time="0.002376" result="Pass" />
+      <test name="DataReaderTest.one string" type="DataReaderTest" method="one string" time="0.000783" result="Pass" />
+      <test name="DataReaderTest.one ubyte" type="DataReaderTest" method="one ubyte" time="0.0034682" result="Pass" />
+      <test name="DataReaderTest.one decimal" type="DataReaderTest" method="one decimal" time="0.0036093" result="Pass" />
+      <test name="DataReaderTest.lambda post process many" type="DataReaderTest" method="lambda post process many" time="0.0248179" result="Pass" />
+      <test name="DataReaderTest.one int32" type="DataReaderTest" method="one int32" time="0.0007672" result="Pass" />
+      <test name="DataReaderTest.single record" type="DataReaderTest" method="single record" time="0.0009951" result="Pass" />
+    </collection>
+  </assembly>
+</assemblies>
