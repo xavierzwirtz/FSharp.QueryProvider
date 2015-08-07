@@ -113,12 +113,12 @@ let ``one string``() =
     Assert.Equal("foo bar", result)
 [<Fact>]
 let ``one bool true``() =
-    let reader = new LocalDataReader([[1]])
+    let reader = new LocalDataReader([[0]])
     let result = (read reader (ctorOneSimple typedefof<bool>)) :?> bool
     Assert.Equal(true, result)
 [<Fact>]
 let ``one bool false``() =
-    let reader = new LocalDataReader([[0]])
+    let reader = new LocalDataReader([[1]])
     let result = (read reader (ctorOneSimple typedefof<bool>)) :?> bool
     Assert.Equal(false , result)
 //[<Fact>]

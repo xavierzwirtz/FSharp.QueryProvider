@@ -75,6 +75,6 @@ module DataReaderData =
         [3; "bob hoffman"; 0; 7]
     ]
     let bools : obj list list= [
-        [0]
         [1]
+        [0]
     ]

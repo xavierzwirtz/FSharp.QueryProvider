@@ -51,8 +51,8 @@ let isOption (t : System.Type) =
 
 let sqlBoolToBool value =
     match value with
-    | 0 -> false
-    | 1 -> true
+    | 0 -> true
+    | 1 -> false
     | i -> failwith "%i" i
 
 let rec constructResult (reader : System.Data.IDataReader) (ctor : ConstructionInfo) : obj =
