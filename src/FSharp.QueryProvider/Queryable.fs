@@ -61,8 +61,17 @@ type Query<'T>(provider : QueryProvider, expression : Expression option) as this
         | None -> Expression.Constant(this) :> Expression
         | Some x -> x
 
+    let mutable result : IEnumerable<'T> option = None
+
     member __.provider = provider
     member __.expression = hardExpression
+    
+    member private this.getEnumerable() = 
+        match result with
+        | None -> 
+            this.provider.Execute(hardExpression) :?> IEnumerable<'T>
+        | Some result -> 
+            result
 
     interface IQueryable<'T> with
         member __.Expression =
@@ -75,15 +84,14 @@ type Query<'T>(provider : QueryProvider, expression : Expression option) as this
             this.provider :> IQueryProvider
 
     interface IOrderedQueryable<'T>
-
+        
     interface IEnumerable with
         member this.GetEnumerator() =
-            let x = this.provider.Execute(hardExpression) :?> IEnumerable
-            x.GetEnumerator()
+            (this.getEnumerable() :> IEnumerable).GetEnumerator()
+
     interface IEnumerable<'T> with
         member this.GetEnumerator() =
-            let x = this.provider.Execute(hardExpression) :?> IEnumerable<'T>
-            x.GetEnumerator()
+            this.getEnumerable().GetEnumerator()
 
     override __.ToString () =
         match expression with 
