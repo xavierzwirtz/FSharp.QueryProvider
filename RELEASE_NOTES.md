@@ -1,3 +1,6 @@
+### 1.0.3 - August 11 2015
+* Fixed queries being executed on each enumeration action.
+
 ### 1.0.2 - August 7 2015
 * Fixed bools being inverted
 
