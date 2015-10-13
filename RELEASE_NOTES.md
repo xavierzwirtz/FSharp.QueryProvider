@@ -1,3 +1,6 @@
+### 1.0.4 - October 10 2015
+* Fixed not handling when sql returns bools typed as an actual bool
+
 ### 1.0.3 - August 11 2015
 * Fixed queries being executed on each enumeration action.
 
