@@ -106,7 +106,11 @@ and constructType reader typeCtor =
         t = typedefof<int64> then
         getValue (getSingleIndex())
     else if t = typedefof<bool> then
-        getValue (getSingleIndex()) :?> int |> sqlBoolToBool :> obj
+        let value = getValue (getSingleIndex())
+        match value with 
+        | :? int as i -> i |> sqlBoolToBool :> obj
+        | :? bool as b -> b :> obj
+        | x -> failwith "unexpected type %s" (x.GetType().FullName)
     else if t.IsEnum then
         getValue (getSingleIndex())
     else if isOption t then
