@@ -438,8 +438,24 @@ module QueryGenTest =
 
         AreEqualTranslateExpression translate q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] FROM [PersonMod] AS T WHERE (T.[PersonId] IN (SELECT T2.[PersonId] FROM [Employee] AS T2))" [] (personSelect)
 
+
     [<Fact>]
     let ``where local var``() =
+        
+        let name = "john"
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                where(p.PersonName = name)
+                select p
+            }
+        
+        AreEqualDeleteOrSelectExpression q "SELECT T.[PersonId], T.[PersonName], T.[JobKind], T.[VersionNo] " "FROM [Person] AS T WHERE (T.[PersonName] = @p1)" [
+            {Name="@p1"; Value=(name); DbType = System.Data.SqlDbType.NVarChar}
+        ] (personSelect)
+
+    [<Fact>]
+    let ``where local ref var``() =
         
         let name = ref "john"
         let q = fun (persons : IQueryable<Person>) -> 
