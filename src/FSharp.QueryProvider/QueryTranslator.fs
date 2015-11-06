@@ -272,7 +272,7 @@ module QueryTranslator =
             let bin (e : BinaryExpression) (text : string) = 
                 let leftSql, leftParams, leftCtor = map(e.Left)
                 let rightSql, rightParams, rightCtor = map(e.Right)
-                Some (leftSql @ [" "; text; " "] @ rightSql, leftParams @ rightParams, leftCtor @ rightCtor)
+                Some (["("] @ leftSql @ [" "; text; " "] @ rightSql @ [")"], leftParams @ rightParams, leftCtor @ rightCtor)
 
             let result : option<string list * PreparedParameter<_> list * ConstructionInfo list>= 
                 match e with
@@ -572,7 +572,7 @@ module QueryTranslator =
                                 | Some c -> 
                                     let xq, xp, xc = getLambda(select.Value).Body |> map
                                     let yq, yp, yc = c.Arguments.Item(1) |> map
-                                    Some (xq @ [" = "] @ yq, xp @ yp, xc @ yc)
+                                    Some (["("] @ xq @ [" = "] @ yq @ [")"], xp @ yp, xc @ yc)
                                 | None -> None
 
                             let total = 
@@ -580,7 +580,7 @@ module QueryTranslator =
                                 | None, None -> None
                                 | Some w, None -> Some w
                                 | None, Some c -> Some c
-                                | Some(wq,wp,wc), Some(cq,cp,cc) -> Some(wq @ [" AND "] @ cq, wp @ cp, wc @ cc)
+                                | Some(wq,wp,wc), Some(cq,cp,cc) -> Some(["("] @ wq @ [" AND "] @ cq @ [")"], wp @ cp, wc @ cc)
 
                             match total with 
                             | None -> [], [], []
