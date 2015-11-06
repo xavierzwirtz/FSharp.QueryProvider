@@ -295,6 +295,7 @@ module QueryTranslator =
                         let firstOrDefault, ml = getMethod "FirstOrDefault" ml
                         let max, ml = getMethod "Max" ml
                         let min, ml = getMethod "Min" ml
+                        let sum, ml = getMethod "Sum" ml
                         let any, ml = getMethod "Any" ml
                         let groupBy, ml = getMethod "GroupBy" ml
                         
@@ -316,7 +317,7 @@ module QueryTranslator =
                             | Some _ -> sorts @ [m.Value], m
                             | None -> sorts, m
 
-                        let needsSelect = lazy ([count; contains; any; maxOrMin; select] |> Seq.exists(Option.isSome))
+                        let needsSelect = lazy ([count; contains; any; maxOrMin; sum; select] |> Seq.exists(Option.isSome))
                         if ml |> Seq.length > 0 then 
                             let methodNames = (ml |> Seq.map(fun m -> sprintf "'%s'" m.Method.Name) |> String.concat(","))
                             failwithf "Methods not implemented: %s" methodNames
@@ -371,6 +372,14 @@ module QueryTranslator =
                                     | None -> 
                                         if contains.IsSome || any.IsSome then
                                             ["CASE WHEN COUNT(*) > 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END "], [] , (Some (createConstructionInfoForType 0 typedefof<bool> Single))
+                                        else if sum.IsSome then
+                                            let sum = sum.Value
+                                            let l = getLambda(sum)
+                                            let columns, _, _ = 
+                                                match l.Body with
+                                                | MemberAccess m -> map m
+                                                | _ -> failwith "not implemented lambda body"
+                                            ["SUM("] @ columns @ [") "], [], (Some (createConstructionInfoForType 0 l.ReturnType Single))
                                         else
                                             let partialSelect (l : LambdaExpression) =
                                                 let t = l.ReturnType

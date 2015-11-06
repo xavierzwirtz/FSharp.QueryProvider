@@ -1250,6 +1250,15 @@ module QueryGenTest =
             {Name="@p1"; Value="john"; DbType = System.Data.SqlDbType.NVarChar}
         ] (personSelect)
 
+    [<Fact>]
+    let ``sum``() =
+        let q = fun (persons : IQueryable<Person>) -> 
+            query {
+                for p in persons do
+                sumBy(p.PersonId)
+            }
+                   
+        AreEqualExpression q "SELECT SUM(T.[PersonId]) FROM [Person] AS T" [] (intSelect 0 Single)
 
 // To be implemented:        
 //query {
