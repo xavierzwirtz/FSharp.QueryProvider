@@ -505,8 +505,7 @@ module QueryTranslator =
                                                 let lambda = Expression.Lambda(body, [source])
 
                                                 { selectCtor with 
-                                                    PostProcess = Some lambda
-                                                }
+                                                    PostProcess = Some lambda }
                                             | None -> selectCtor
                                         [constructed]
                                     | None -> []

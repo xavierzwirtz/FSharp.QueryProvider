@@ -1186,7 +1186,7 @@ module QueryGenTest =
                 select(g.Key)
             }
 
-        let grouped = AreEqualExpressionReturn q "SELECT T.[JobKind] FROM [Person] AS T" DataReaderData.persons
+        let grouped = AreEqualExpressionReturn q "SELECT T.[JobKind] FROM [Person] AS T GROUP BY T.[JobKind]" [[0 :> obj]; [1 :> obj]]
         let grouped = grouped :?> seq<JobKind>
 
         areSeqEqual [JobKind.Salesman; JobKind.Manager] grouped
