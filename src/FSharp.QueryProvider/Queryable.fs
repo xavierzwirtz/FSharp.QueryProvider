@@ -62,16 +62,20 @@ type Query<'T>(provider : QueryProvider, expression : Expression option) as this
         | Some x -> x
 
     let mutable result : IEnumerable<'T> option = None
+    let resultLock = obj()
 
     member __.provider = provider
     member __.expression = hardExpression
     
     member private this.getEnumerable() = 
-        match result with
-        | None -> 
-            this.provider.Execute(hardExpression) :?> IEnumerable<'T>
-        | Some result -> 
-            result
+        lock resultLock (fun () ->
+            match result with
+            | None -> 
+                let res = this.provider.Execute(hardExpression) :?> IEnumerable<'T>
+                result <- Some res
+                res
+            | Some result -> 
+                result)
 
     interface IQueryable<'T> with
         member __.Expression =
