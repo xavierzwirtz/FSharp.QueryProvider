@@ -36,6 +36,9 @@
 
 
 <h1>QueryTranslatorUtilities</h1>
+<p>
+  <span>Namespace: FSharp.QueryProvider</span><br />
+</p>
 <div class="xmldoc">
 </div>
 
@@ -52,19 +55,24 @@
             <a href="fsharp-queryprovider-querytranslatorutilities-context.html">Context</a>
           </td>
           <td class="xmldoc"><p>Context to be passed down when translating expressions.</p>
+
+
 </td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="fsharp-queryprovider-querytranslatorutilities-dbtype-1.html">DBType<'t></a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc">
+</td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="fsharp-queryprovider-querytranslatorutilities-getcolumnname.html">GetColumnName</a>
           </td>
           <td class="xmldoc"><p>Signature for getting a column name</p>
+
+
 </td>
         </tr>
         <tr>
@@ -72,6 +80,8 @@
             <a href="fsharp-queryprovider-querytranslatorutilities-getdbtype-1.html">GetDBType<'t></a>
           </td>
           <td class="xmldoc"><p>Signarture for getting a DBType</p>
+
+
 </td>
         </tr>
         <tr>
@@ -79,6 +89,8 @@
             <a href="fsharp-queryprovider-querytranslatorutilities-gettablename.html">GetTableName</a>
           </td>
           <td class="xmldoc"><p>Signature for getting a table name</p>
+
+
 </td>
         </tr>
         <tr>
@@ -86,6 +98,8 @@
             <a href="fsharp-queryprovider-querytranslatorutilities-typesource.html">TypeSource</a>
           </td>
           <td class="xmldoc"><p>Wrap different sources of type.</p>
+
+
 </td>
         </tr>
     </tbody>
@@ -119,8 +133,8 @@
             createNull columnIndex dbType
           </code>
           <div class="tip" id="102">
-            <strong>Signature:</strong> columnIndex:int -&gt; dbType:DBType&lt;&#39;?6200&gt; -&gt; string list * PreparedParameter&lt;&#39;?6200&gt; list * ConstructionInfo list<br />
-                          <strong>Type parameters:</strong> '?6200          </div>
+            <strong>Signature:</strong> columnIndex:int -&gt; dbType:DBType&lt;&#39;?7271&gt; -&gt; string list * PreparedParameter&lt;&#39;?7271&gt; list * ConstructionInfo list<br />
+                          <strong>Type parameters:</strong> '?7271          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/QueryTranslatorUtilities.fs#L206-206" class="github-link">
@@ -128,6 +142,8 @@
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>Create a DbNull parameter for a type.</p>
+
+
 
         </td>
       </tr>
@@ -138,8 +154,8 @@
             createParameter columnIndex value dbType
           </code>
           <div class="tip" id="103">
-            <strong>Signature:</strong> columnIndex:&#39;?6193 -&gt; value:&#39;?6194 -&gt; dbType:&#39;?6195 -&gt; PreparedParameter&lt;&#39;?6195&gt;<br />
-                          <strong>Type parameters:</strong> '?6193, '?6194, '?6195          </div>
+            <strong>Signature:</strong> columnIndex:&#39;?7264 -&gt; value:&#39;?7265 -&gt; dbType:&#39;?7266 -&gt; PreparedParameter&lt;&#39;?7266&gt;<br />
+                          <strong>Type parameters:</strong> '?7264, '?7265, '?7266          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/QueryTranslatorUtilities.fs#L166-166" class="github-link">
@@ -147,6 +163,8 @@
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>Create a prepared parameter</p>
+
+
 
         </td>
       </tr>
@@ -167,6 +185,8 @@
             </a>
           <p>Unwrap a method call expression and get its lambda argument.</p>
 
+
+
         </td>
       </tr>
       <tr>
@@ -185,6 +205,8 @@
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>Take an expression for either a funciton or a member access chain and get the value.</p>
+
+
 
         </td>
       </tr>
@@ -205,6 +227,8 @@
             </a>
           <p>Gets a method by name from a list</p>
 
+
+
         </td>
       </tr>
       <tr>
@@ -223,6 +247,8 @@
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>Gets all methods with a particular name</p>
+
+
 
         </td>
       </tr>
@@ -243,6 +269,8 @@
             </a>
           <p>Get all operations in a LINQ chain and the queryable they are operating on.</p>
 
+
+
         </td>
       </tr>
       <tr>
@@ -262,6 +290,8 @@
             </a>
           <p>shorthand for invoking a MethodCallExpression</p>
 
+
+
         </td>
       </tr>
       <tr>
@@ -271,8 +301,8 @@
             splitResults source
           </code>
           <div class="tip" id="110">
-            <strong>Signature:</strong> source:(&#39;?6187 list * &#39;?6188 list * &#39;?6189 list) list -&gt; &#39;?6187 list * &#39;?6188 list * &#39;?6189 list<br />
-                          <strong>Type parameters:</strong> '?6187, '?6188, '?6189          </div>
+            <strong>Signature:</strong> source:(&#39;?7258 list * &#39;?7259 list * &#39;?7260 list) list -&gt; &#39;?7258 list * &#39;?7259 list * &#39;?7260 list<br />
+                          <strong>Type parameters:</strong> '?7258, '?7259, '?7260          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/QueryTranslatorUtilities.fs#L119-119" class="github-link">
@@ -280,6 +310,8 @@
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>Take a list<'a list * 'b list * 'c list> and concat a, b, and c no themseleves, producing a 'a list <em> 'b list </em> 'c list</p>
+
+
 
         </td>
       </tr>
@@ -300,6 +332,8 @@
             </a>
           <p>Assert that a union case has exactly one field, then return its Reflection.PropertyInfo</p>
 
+
+
         </td>
       </tr>
       <tr>
@@ -318,6 +352,8 @@
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>Gets the underlying type for fsharp types</p>
+
+
 
         </td>
       </tr>
@@ -338,6 +374,8 @@
             </a>
           <p>Get the actual value of an object. Unwraps options and unions</p>
 
+
+
         </td>
       </tr>
       <tr>
@@ -347,8 +385,8 @@
             valueToQueryAndParam (...)
           </code>
           <div class="tip" id="114">
-            <strong>Signature:</strong> columnIndex:int -&gt; dbType:DBType&lt;&#39;?6198&gt; -&gt; value:obj -&gt; string list * PreparedParameter&lt;&#39;?6198&gt; list * ConstructionInfo list<br />
-                          <strong>Type parameters:</strong> '?6198          </div>
+            <strong>Signature:</strong> columnIndex:int -&gt; dbType:DBType&lt;&#39;?7269&gt; -&gt; value:obj -&gt; string list * PreparedParameter&lt;&#39;?7269&gt; list * ConstructionInfo list<br />
+                          <strong>Type parameters:</strong> '?7269          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/VoiceOfWisdom/FSharp.QueryProvider/tree/master/src/FSharp.QueryProvider/QueryTranslatorUtilities.fs#L192-192" class="github-link">
@@ -356,6 +394,8 @@
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>Create query and parametter</p>
+
+
 
         </td>
       </tr>
@@ -383,6 +423,8 @@
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>Matches a lambda for <code>fun p -&gt; p</code></p>
+
+
 
         </td>
       </tr>
