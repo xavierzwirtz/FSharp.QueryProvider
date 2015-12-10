@@ -1,3 +1,7 @@
+### 1.0.5 - December 10 2015
+* Fixed not handling when sql returns bools typed as an actual bool for records
+* Added better error messages when types mismatch
+
 ### 1.0.4 - October 10 2015
 * Fixed not handling when sql returns bools typed as an actual bool
 
