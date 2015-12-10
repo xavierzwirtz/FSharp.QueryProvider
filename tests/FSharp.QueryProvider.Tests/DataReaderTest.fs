@@ -83,7 +83,20 @@ let ctorVerboseRecord returnType =
       Type = typedefof<VerboseRecord>
       TypeOrLambda = 
           TypeOrLambdaConstructionInfo.Type { Type = typedefof<VerboseRecord>
-                                              ConstructorArgs = [ 0..12 ] |> Seq.map (fun i -> Value i)
+                                              ConstructorArgs = 
+                                                [ Value 0
+                                                  Bool 1
+                                                  Value 2
+                                                  Value 3
+                                                  Value 4
+                                                  Value 5
+                                                  Value 6
+                                                  Value 7
+                                                  Value 8
+                                                  Value 9
+                                                  Value 10
+                                                  Value 11
+                                                  Value 12 ]
                                               PropertySets = [] }
       PostProcess = None }
 
@@ -419,6 +432,21 @@ let ``lambda type mod``() =
     
     let result = (read reader ctor) :?> string
     "foobar" == result
+
+[<Fact>]
+let ``wrong type``() = 
+    let d = System.DateTime.Now
+    let g = System.Guid.NewGuid()
+    let reader = new LocalDataReader([ [ "foobar"; "wrongtype"; 5uy; 'g'; d; 1.23M; 1.45; 1.67; g; 2s; 3; 4L; 0 ] ])
+    let e = 
+        Assert.Throws<System.Exception>(fun () -> (read reader (ctorVerboseRecord Single)) |> ignore)
+
+    let message = 
+        "Exception initializing record, types did not match:\n" +
+        "Field \"Bool\" expected type \"System.Boolean\" but was \"System.String\""
+
+    message == e.Message
+
 //
 //[<Fact>]
 //let ``group``() =

@@ -49,11 +49,15 @@ let isOption (t : System.Type) =
     t.IsGenericType &&
     t.GetGenericTypeDefinition() = typedefof<Option<_>>
 
-let sqlBoolToBool value =
-    match value with
-    | 0 -> true
-    | 1 -> false
-    | i -> failwith "%i" i
+let readBool (value : obj) = 
+    match value with 
+    | :? int as i -> 
+        match i with 
+        | 0 -> true :> obj
+        | 1 -> false :> obj
+        | i -> failwith "not a bit %i" i
+    | :? bool as b -> b :> obj
+    | x -> failwithf "unexpected type %s" (x.GetType().FullName)
 
 let rec constructResult (reader : System.Data.IDataReader) (ctor : ConstructionInfo) : obj =
     
@@ -71,8 +75,7 @@ and invokeLambda reader lambdaCtor =
             | TypeOrValueOrLambdaConstructionInfo.Type typeCtor -> constructType reader typeCtor
             | TypeOrValueOrLambdaConstructionInfo.Lambda lambdaCtor -> invokeLambda reader lambdaCtor
             | TypeOrValueOrLambdaConstructionInfo.Value i -> reader.GetValue i
-            | TypeOrValueOrLambdaConstructionInfo.Bool i -> sqlBoolToBool ((reader.GetValue i) :?> int) :> obj
-        )
+            | TypeOrValueOrLambdaConstructionInfo.Bool i -> readBool ((reader.GetValue i)))
     lambdaCtor.Lambda.Compile().DynamicInvoke(paramValues |> Seq.toArray)
 
 and constructType reader typeCtor = 
@@ -106,11 +109,7 @@ and constructType reader typeCtor =
         t = typedefof<int64> then
         getValue (getSingleIndex())
     else if t = typedefof<bool> then
-        let value = getValue (getSingleIndex())
-        match value with 
-        | :? int as i -> i |> sqlBoolToBool :> obj
-        | :? bool as b -> b :> obj
-        | x -> failwithf "unexpected type %s" (x.GetType().FullName)
+        getValue (getSingleIndex()) |> readBool 
     else if t.IsEnum then
         getValue (getSingleIndex())
     else if isOption t then
@@ -124,24 +123,51 @@ and constructType reader typeCtor =
             else
                 None :> obj
     else
-        let ctorArgs = 
+        let getCtorArgs () =  
             typeCtor.ConstructorArgs
             |> Seq.map(fun arg -> 
                 match arg with 
                 | Type t -> constructType reader t
                 | Lambda l -> invokeLambda reader l
-                | Bool i -> getValue (i) :?> int |> sqlBoolToBool :> obj
-                | Value i -> getValue i
-            )
+                | Bool i -> i |> getValue |> readBool
+                | Value i -> getValue i)
+            |> Seq.toArray
 
         let inst = 
             if FSharpType.IsRecord t then
-                FSharpValue.MakeRecord(t, (ctorArgs |> Seq.toArray))
+                try
+                    FSharpValue.MakeRecord(t, getCtorArgs())
+                with
+                | ex ->
+                    let wrongTypeFields =
+                        FSharpType.GetRecordFields t
+                        |> Seq.mapi(fun i x -> 
+                            let returnType = reader.GetFieldType i
+                            let expectedType =
+                                if x.PropertyType.IsEnum then
+                                    typedefof<int>
+                                else
+                                    x.PropertyType
+                            returnType, expectedType, x)
+                        |> Seq.filter(fun (rt, et, _) ->
+                            rt <> et)
+                    
+                    let fieldMessages = 
+                        wrongTypeFields 
+                        |> Seq.map(fun (rt, et, recField) ->
+                            sprintf "Field \"%s\" expected type \"%s\" but was \"%s\"" recField.Name
+                                                                                       et.FullName
+                                                                                       rt.FullName)
+                        |> String.concat "\n"
+                    let message = 
+                        "Exception initializing record, types did not match:\n" + 
+                        fieldMessages
+                    let newEx = System.Exception(message, ex)
+                    raise newEx
             else
-                System.Activator.CreateInstance(t, ctorArgs |> Seq.toArray)
-
+                System.Activator.CreateInstance(t, getCtorArgs())
         if typeCtor.PropertySets |> Seq.length > 0 then
-            failwith "propertySets are not implemented"
+            failwith "PropertySets are not implemented"
         
         inst
 
