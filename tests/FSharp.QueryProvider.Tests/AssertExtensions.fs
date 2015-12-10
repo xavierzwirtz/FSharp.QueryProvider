@@ -11,3 +11,6 @@ let areSeqEqual e a =
     if not (compareSeq e a) then
         let message = sprintf "Expected: %A \nActual: %A" (e |> Seq.toList) (a |> Seq.toList)
         raise (Xunit.Sdk.AssertActualExpectedException(e, a, message))
+
+let (==) (expected : 't) (actual : 't) =
+    Assert.Equal<'t>(expected, actual)

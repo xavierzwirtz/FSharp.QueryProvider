@@ -106,6 +106,7 @@ type Query<'T>(provider : QueryProvider, expression : Expression option) as this
 /// Type to remove boiler plate when implementing IQueryProvider
 /// </summary>
 and [<AbstractClass>] QueryProvider() =
+
     interface IQueryProvider with 
         
         member this.CreateQuery<'S> (expression : Expression) = 
@@ -132,6 +133,7 @@ and [<AbstractClass>] QueryProvider() =
 
 let makeQuery<'t> queryProvider =
     Query<'t>(queryProvider, None) :> System.Linq.IQueryable<'t>
+
 /// <summary>
 /// Reusable IQueryProvider for IDbConnection.
 /// </summary>

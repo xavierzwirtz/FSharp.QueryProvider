@@ -1,293 +1,241 @@
 ﻿module DataReaderTest
 
+open System.Linq.Expressions
+
 open FSharp.QueryProvider
 open FSharp.QueryProvider.DataReader
-
 open Models
 open LocalDataReader
 
-type UnionEnum =
-| One = 0
-| Two = 1
-| Three = 2
+type UnionEnum = 
+    | One = 0
+    | Two = 1
+    | Three = 2
 
-type VerboseRecord = {
-    String : string
-    Bool : bool
-    Byte : byte
-    Char : char
-    DateTime : System.DateTime
-    Decimal : decimal
-    Double : double
-    Float : float
-    Guid : System.Guid
-    Int16 : int16
-    Int32 : int32
-    Int64 : int64
-    UnionEnum : UnionEnum
-}
+type VerboseRecord = 
+    { String : string
+      Bool : bool
+      Byte : byte
+      Char : char
+      DateTime : System.DateTime
+      Decimal : decimal
+      Double : double
+      Float : float
+      Guid : System.Guid
+      Int16 : int16
+      Int32 : int32
+      Int64 : int64
+      UnionEnum : UnionEnum }
 
-type Name = {
-    Value : string
-}
+type Name = 
+    { Value : string }
 
-type OptionName = {
-    OptionValue : string option
-}
+type OptionName = 
+    { OptionValue : string option }
 
-type KeyValuePair = {
-    Key : string
-    KeyValue : string
-}
+type KeyValuePair = 
+    { Key : string
+      KeyValue : string }
 
 let ctorOneSimple t = 
-    {
-        ReturnType = Single
-        Type = t
-        TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
-            Type = t
-            ConstructorArgs = [Value 0]
-            PropertySets = []
-        }
-        PostProcess = None
-    }
+    { ReturnType = Single
+      Type = t
+      TypeOrLambda = 
+          TypeOrLambdaConstructionInfo.Type { Type = t
+                                              ConstructorArgs = [ Value 0 ]
+                                              PropertySets = [] }
+      PostProcess = None }
 
 let ctorManySimple t = 
-    {
-        ReturnType = Many
-        Type = t
-        TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
-            Type = t
-            ConstructorArgs = [Value 0]
-            PropertySets = []
-        }
-        PostProcess = None
-    }
+    { ReturnType = Many
+      Type = t
+      TypeOrLambda = 
+          TypeOrLambdaConstructionInfo.Type { Type = t
+                                              ConstructorArgs = [ Value 0 ]
+                                              PropertySets = [] }
+      PostProcess = None }
 
-let ctorName returnType =
-    {
-        ReturnType = returnType
-        Type = typedefof<Name>
-        TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
-            Type = typedefof<Name>
-            ConstructorArgs = [Value 0]
-            PropertySets = []
-        }
-        PostProcess = None
-    }
+let ctorName returnType = 
+    { ReturnType = returnType
+      Type = typedefof<Name>
+      TypeOrLambda = 
+          TypeOrLambdaConstructionInfo.Type { Type = typedefof<Name>
+                                              ConstructorArgs = [ Value 0 ]
+                                              PropertySets = [] }
+      PostProcess = None }
 
-let ctorOptionName =
-    createTypeConstructionInfo typedefof<OptionName> [
-        Type (createTypeConstructionInfo (Some("").GetType()) [Value 0] [])
-    ] []
+let ctorOptionName = 
+    createTypeConstructionInfo typedefof<OptionName> 
+        [ Type(createTypeConstructionInfo (Some("").GetType()) [ Value 0 ] []) ] []
 
-let ctorOptionNameFull returnType =
-    {
-        ReturnType = returnType
-        Type = typedefof<OptionName>
-        TypeOrLambda = TypeOrLambdaConstructionInfo.Type ctorOptionName
-        PostProcess = None
-    }
+let ctorOptionNameFull returnType = 
+    { ReturnType = returnType
+      Type = typedefof<OptionName>
+      TypeOrLambda = TypeOrLambdaConstructionInfo.Type ctorOptionName
+      PostProcess = None }
 
-let ctorKeyValuePair =
-    createTypeConstructionInfo typedefof<OptionName> [
-        Value 0; Value 1
-    ] []
+let ctorKeyValuePair = 
+    createTypeConstructionInfo typedefof<OptionName> [ Value 0
+                                                       Value 1 ] []
 
 let ctorVerboseRecord returnType = 
-    {
-        ReturnType = returnType
-        Type = typedefof<VerboseRecord>
-        TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
-            Type = typedefof<VerboseRecord>
-            ConstructorArgs = [0..12] |> Seq.map(fun i -> Value i)
-            PropertySets = []
-        }
-        PostProcess = None
-    }
+    { ReturnType = returnType
+      Type = typedefof<VerboseRecord>
+      TypeOrLambda = 
+          TypeOrLambdaConstructionInfo.Type { Type = typedefof<VerboseRecord>
+                                              ConstructorArgs = [ 0..12 ] |> Seq.map (fun i -> Value i)
+                                              PropertySets = [] }
+      PostProcess = None }
 
 [<Fact>]
-let ``one string``() =
-    let reader = new LocalDataReader([["foo bar"]])
+let ``one string``() = 
+    let reader = new LocalDataReader([ [ "foo bar" ] ])
     let result = (read reader (ctorOneSimple typedefof<string>)) :?> string
-    Assert.Equal("foo bar", result)
+    "foo bar" == result
 
 [<Fact>]
-let ``one bool true``() =
-    let reader = new LocalDataReader([[true]])
+let ``one bool true``() = 
+    let reader = new LocalDataReader([ [ true ] ])
     let result = (read reader (ctorOneSimple typedefof<bool>)) :?> bool
-    Assert.Equal(true, result)
-[<Fact>]
-let ``one bool false``() =
-    let reader = new LocalDataReader([[false]])
-    let result = (read reader (ctorOneSimple typedefof<bool>)) :?> bool
-    Assert.Equal(false , result)
+    true == result
 
 [<Fact>]
-let ``one int bool true``() =
-    let reader = new LocalDataReader([[0]])
+let ``one bool false``() = 
+    let reader = new LocalDataReader([ [ false ] ])
     let result = (read reader (ctorOneSimple typedefof<bool>)) :?> bool
-    Assert.Equal(true, result)
+    false == result
+
 [<Fact>]
-let ``one int bool false``() =
-    let reader = new LocalDataReader([[1]])
+let ``one int bool true``() = 
+    let reader = new LocalDataReader([ [ 0 ] ])
     let result = (read reader (ctorOneSimple typedefof<bool>)) :?> bool
-    Assert.Equal(false , result)
+    true == result
+
+[<Fact>]
+let ``one int bool false``() = 
+    let reader = new LocalDataReader([ [ 1 ] ])
+    let result = (read reader (ctorOneSimple typedefof<bool>)) :?> bool
+    false == result
+
 //[<Fact>]
 //let ``one byte``() =
 //    let reader = new LocalDataReader([[5y]])
 //    let result = (read reader (ctorOneSimple typedefof<sbyte>)) :?> sbyte
 //    Assert.Equal(5y, result)
 [<Fact>]
-let ``one ubyte``() =
-    let reader = new LocalDataReader([[5uy]])
+let ``one ubyte``() = 
+    let reader = new LocalDataReader([ [ 5uy ] ])
     let result = (read reader (ctorOneSimple typedefof<byte>)) :?> byte
-    Assert.Equal(5uy, result)
+    5uy == result
+
 [<Fact>]
-let ``one char``() =
-    let reader = new LocalDataReader([['g']])
+let ``one char``() = 
+    let reader = new LocalDataReader([ [ 'g' ] ])
     let result = (read reader (ctorOneSimple typedefof<char>)) :?> char
-    Assert.Equal('g' , result)
+    'g' == result
+
 [<Fact>]
-let ``one System.DateTime``() =
+let ``one System.DateTime``() = 
     let d = System.DateTime.Now
-    let reader = new LocalDataReader([[d]])
+    let reader = new LocalDataReader([ [ d ] ])
     let result = (read reader (ctorOneSimple typedefof<System.DateTime>)) :?> System.DateTime
-    Assert.Equal(d, result)
+    d == result
+
 [<Fact>]
-let ``one decimal``() =
-    let reader = new LocalDataReader([[1.23m]])
+let ``one decimal``() = 
+    let reader = new LocalDataReader([ [ 1.23m ] ])
     let result = (read reader (ctorOneSimple typedefof<decimal>)) :?> decimal
-    Assert.Equal(1.23m, result)
+    1.23m == result
+
 [<Fact>]
-let ``one double``() =
-    let reader = new LocalDataReader([[4.14]])
+let ``one double``() = 
+    let reader = new LocalDataReader([ [ 4.14 ] ])
     let result = (read reader (ctorOneSimple typedefof<double>)) :?> double
-    Assert.Equal(4.14, result)
+    4.14 == result
+
 [<Fact>]
-let ``one float``() =
-    let reader = new LocalDataReader([[4.14]])
+let ``one float``() = 
+    let reader = new LocalDataReader([ [ 4.14 ] ])
     let result = (read reader (ctorOneSimple typedefof<float>)) :?> float
-    Assert.Equal(4.14, result)
+    4.14 == result
+
 [<Fact>]
-let ``one System.Guid``() =
+let ``one System.Guid``() = 
     let g = System.Guid.NewGuid()
-    let reader = new LocalDataReader([[g]])
+    let reader = new LocalDataReader([ [ g ] ])
     let result = (read reader (ctorOneSimple typedefof<System.Guid>)) :?> System.Guid
-    Assert.Equal(g, result)
+    g == result
+
 [<Fact>]
-let ``one int16``() =
-    let reader = new LocalDataReader([[86s]])
+let ``one int16``() = 
+    let reader = new LocalDataReader([ [ 86s ] ])
     let result = (read reader (ctorOneSimple typedefof<int16>)) :?> int16
-    Assert.Equal(86s, result)
+    86s == result
+
 [<Fact>]
-let ``one int32``() =
-    let reader = new LocalDataReader([[5]])
+let ``one int32``() = 
+    let reader = new LocalDataReader([ [ 5 ] ])
     let result = (read reader (ctorOneSimple typedefof<int32>)) :?> int32
-    Assert.Equal(5, result)
+    5 == result
+
 [<Fact>]
-let ``one int64``() =
-    let reader = new LocalDataReader([[5L]])
+let ``one int64``() = 
+    let reader = new LocalDataReader([ [ 5L ] ])
     let result = (read reader (ctorOneSimple typedefof<int64>)) :?> int64
-    Assert.Equal(5L, result)
+    5L == result
+
 [<Fact>]
-let ``one UnionEnum``() =
-    let reader = new LocalDataReader([[1]])
+let ``one UnionEnum``() = 
+    let reader = new LocalDataReader([ [ 1 ] ])
     let result = (read reader (ctorOneSimple typedefof<UnionEnum>)) :?> UnionEnum
-    Assert.Equal(UnionEnum.Two, result)
+    UnionEnum.Two == result
 
 //no need to test the many for every type
 [<Fact>]
-let ``many string``() =
-    let reader = new LocalDataReader([["foo"]; ["bar"]])
+let ``many string``() = 
+    let reader = 
+        new LocalDataReader([ [ "foo" ]
+                              [ "bar" ] ])
+    
     let result = (read reader (ctorManySimple typedefof<string>)) :?> string seq
-    areSeqEqual ["foo"; "bar"] result
+    areSeqEqual [ "foo"; "bar" ] result
 
 [<Fact>]
-let ``one verbose record``() =
+let ``one verbose record``() = 
     let d = System.DateTime.Now
     let g = System.Guid.NewGuid()
-
-    let reader = 
-        new LocalDataReader(
-            [[
-                "foobar"
-                true
-                5uy
-                'g'
-                d
-                1.23M
-                1.45
-                1.67
-                g
-                2s
-                3
-                4L
-                0
-            ]]
-        )
-
+    let reader = new LocalDataReader([ [ "foobar"; true; 5uy; 'g'; d; 1.23M; 1.45; 1.67; g; 2s; 3; 4L; 0 ] ])
     let result = (read reader (ctorVerboseRecord Single)) :?> VerboseRecord
-    let e = {
-        String = "foobar"
-        Bool = true
-        Byte = 5uy
-        Char = 'g'
-        DateTime = d
-        Decimal = 1.23M
-        Double = 1.45
-        Float = 1.67
-        Guid = g
-        Int16 = 2s
-        Int32 = 3
-        Int64 = 4L
-        UnionEnum = UnionEnum.One
-    }
-
+    
+    let e = 
+        { String = "foobar"
+          Bool = true
+          Byte = 5uy
+          Char = 'g'
+          DateTime = d
+          Decimal = 1.23M
+          Double = 1.45
+          Float = 1.67
+          Guid = g
+          Int16 = 2s
+          Int32 = 3
+          Int64 = 4L
+          UnionEnum = UnionEnum.One }
     Assert.Equal(e, result)
 
 [<Fact>]
-let ``many verbose record``() =
+let ``many verbose record``() = 
     let d = System.DateTime.Now
     let g = System.Guid.NewGuid()
-
+    
     let reader = 
-        new LocalDataReader(
-            [[
-                "foobar"
-                true
-                5uy
-                'g'
-                d
-                1.23M
-                1.45
-                1.67
-                g
-                2s
-                3
-                4L
-                1
-            ]; [
-                "foobar2"
-                false
-                6uy
-                'd'
-                d
-                1.56M
-                1.78
-                1.90
-                g
-                3s
-                4
-                5L
-                2
-            ]]
-        )
-
+        new LocalDataReader([ [ "foobar"; true; 5uy; 'g'; d; 1.23M; 1.45; 1.67; g; 2s; 3; 4L; 1 ]
+                              [ "foobar2"; false; 6uy; 'd'; d; 1.56M; 1.78; 1.90; g; 3s; 4; 5L; 2 ] ])
+    
     let result = (read reader (ctorVerboseRecord Many)) :?> VerboseRecord seq
-    let e = [
-        {
-            String = "foobar"
+    
+    let e = 
+        [ { String = "foobar"
             Bool = true
             Byte = 5uy
             Char = 'g'
@@ -299,9 +247,8 @@ let ``many verbose record``() =
             Int16 = 2s
             Int32 = 3
             Int64 = 4L
-            UnionEnum = UnionEnum.Two
-        }; {
-            String = "foobar2"
+            UnionEnum = UnionEnum.Two }
+          { String = "foobar2"
             Bool = false
             Byte = 6uy
             Char = 'd'
@@ -313,222 +260,165 @@ let ``many verbose record``() =
             Int16 = 3s
             Int32 = 4
             Int64 = 5L
-            UnionEnum = UnionEnum.Three
-        }
-    ]
-
+            UnionEnum = UnionEnum.Three } ]
     areSeqEqual e result
 
 [<Fact>]
-let ``single record``() =
-
-    let reader = 
-        new LocalDataReader([["first"]])
-
+let ``single record``() = 
+    let reader = new LocalDataReader([ [ "first" ] ])
     let result = (read reader (ctorName Single)) :?> Name
-
-    Assert.Equal({Value = "first"}, result)
-
-[<Fact>]
-let ``single record multiple values throws``() =
-
-    let reader = 
-        new LocalDataReader([["first"]; ["second"]])
-
-    let e = Assert.Throws<System.InvalidOperationException>(fun () -> (read reader (ctorName Single)) |> ignore)
-
-    Assert.Equal("Sequence contains more than one element", e.Message)
+    { Value = "first" } == result
 
 [<Fact>]
-let ``single record no values throws``() =
-
+let ``single record multiple values throws``() = 
     let reader = 
-        new LocalDataReader([])
-
+        new LocalDataReader([ [ "first" ]
+                              [ "second" ] ])
+    
     let e = Assert.Throws<System.InvalidOperationException>(fun () -> (read reader (ctorName Single)) |> ignore)
+    "Sequence contains more than one element" == e.Message
 
-    Assert.Equal("Sequence contains no elements", e.Message)
+[<Fact>]
+let ``single record no values throws``() = 
+    let reader = new LocalDataReader([])
+    let e = Assert.Throws<System.InvalidOperationException>(fun () -> (read reader (ctorName Single)) |> ignore)
+    "Sequence contains no elements" == e.Message
 
-let ``singleOrDefault record``() =
-
-    let reader = 
-        new LocalDataReader([["first"]])
-
+let ``singleOrDefault record``() = 
+    let reader = new LocalDataReader([ [ "first" ] ])
     let result = (read reader (ctorName SingleOrDefault)) :?> Name
-
-    Assert.Equal({Value = "first"}, result)
-
-[<Fact>]
-let ``singleOrDefault record multiple values throws``() =
-
-    let reader = 
-        new LocalDataReader([["first"]; ["second"]])
-
-    let e = Assert.Throws<System.InvalidOperationException>(fun () -> (read reader (ctorName SingleOrDefault)) |> ignore)
-
-    Assert.Equal("Sequence contains more than one element", e.Message)
+    { Value = "first" } == result
 
 [<Fact>]
-let ``singleOrDefault record no values defaults``() =
-
+let ``singleOrDefault record multiple values throws``() = 
     let reader = 
-        new LocalDataReader([])
+        new LocalDataReader([ [ "first" ]
+                              [ "second" ] ])
+    
+    let e = 
+        Assert.Throws<System.InvalidOperationException>(fun () -> (read reader (ctorName SingleOrDefault)) |> ignore)
+    "Sequence contains more than one element" == e.Message
 
+[<Fact>]
+let ``singleOrDefault record no values defaults``() = 
+    let reader = new LocalDataReader([])
     let result = (read reader (ctorName SingleOrDefault))
-
-    Assert.Equal(null, result)
+    null == result
 
 [<Fact>]
-let ``option some``() =
-
-    let reader = 
-        new LocalDataReader([["first"]])
-
+let ``option some``() = 
+    let reader = new LocalDataReader([ [ "first" ] ])
     let result = (read reader (ctorOptionNameFull Single)) :?> OptionName
-
-    Assert.Equal({OptionValue = Some "first"}, result)
+    { OptionValue = Some "first" } == result
 
 [<Fact>]
-let ``option none from dbnull``() =
-
-    let reader = 
-        new LocalDataReader([[System.DBNull.Value]])
-
+let ``option none from dbnull``() = 
+    let reader = new LocalDataReader([ [ System.DBNull.Value ] ])
     let result = (read reader (ctorOptionNameFull Single)) :?> OptionName
-
-    Assert.Equal({OptionValue = None}, result)
+    { OptionValue = None } == result
 
 [<Fact>]
-let ``option none from null``() =
-
-    let reader = 
-        new LocalDataReader([[null]])
-
+let ``option none from null``() = 
+    let reader = new LocalDataReader([ [ null ] ])
     let result = (read reader (ctorOptionNameFull Single)) :?> OptionName
-
-    Assert.Equal({OptionValue = None}, result)
-
-open System.Linq.Expressions
+    { OptionValue = None } == result
 
 [<Fact>]
-let ``lambda int add``() =
-
-    let reader = 
-        new LocalDataReader([[5; 2]])
-
+let ``lambda int add``() = 
+    let reader = new LocalDataReader([ [ 5; 2 ] ])
     let p1 = Expression.Parameter(typedefof<int>)
     let p2 = Expression.Parameter(typedefof<int>)
-    let lambda = Expression.Lambda(Expression.Add(p1, p2), [p1; p2])
-
+    let lambda = Expression.Lambda(Expression.Add(p1, p2), [ p1; p2 ])
+    
     let ctor = 
-        {
-            ReturnType = Single
-            Type = typedefof<int>
-            TypeOrLambda = TypeOrLambdaConstructionInfo.Lambda {
-                Lambda = lambda
-                Parameters = [Value 0; Value 1]
-            }
-            PostProcess = None
-        }
-        
+        { ReturnType = Single
+          Type = typedefof<int>
+          TypeOrLambda = 
+              TypeOrLambdaConstructionInfo.Lambda { Lambda = lambda
+                                                    Parameters = 
+                                                        [ Value 0
+                                                          Value 1 ] }
+          PostProcess = None }
+    
     let result = (read reader ctor) :?> int
-
-    Assert.Equal(7, result)
+    7 == result
 
 [<Fact>]
-let ``lambda string mod``() =
-
-    let reader = 
-        new LocalDataReader([["foo"]])
-
-    let lambda = toLambda <@ fun f -> f + "bar"@> 
-
+let ``lambda string mod``() = 
+    let reader = new LocalDataReader([ [ "foo" ] ])
+    let lambda = toLambda <@ fun f -> f + "bar" @>
+    
     let ctor = 
-        {
-            ReturnType = Single
-            Type = typedefof<string>
-            TypeOrLambda = TypeOrLambdaConstructionInfo.Lambda {
-                Lambda = lambda
-                Parameters = [Value 0]
-            }
-            PostProcess = None
-        }
-
+        { ReturnType = Single
+          Type = typedefof<string>
+          TypeOrLambda = 
+              TypeOrLambdaConstructionInfo.Lambda { Lambda = lambda
+                                                    Parameters = [ Value 0 ] }
+          PostProcess = None }
+    
     let result = (read reader ctor) :?> string
-
-    Assert.Equal("foobar", result)
+    "foobar" == result
 
 [<Fact>]
-let ``lambda post process single``() =
-
+let ``lambda post process single``() = 
     let reader = 
-        new LocalDataReader([["foo"]; ["bar"]; ["baz"]])
-
-    let lambda = toLambda <@ fun (vals : string seq) -> vals |> String.concat(" ") @> 
-
+        new LocalDataReader([ [ "foo" ]
+                              [ "bar" ]
+                              [ "baz" ] ])
+    
+    let lambda = toLambda <@ fun (vals : string seq) -> vals |> String.concat (" ") @>
+    
     let ctor = 
-        {
-            ReturnType = Single
-            Type = typedefof<string>
-            TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
-                Type = typedefof<string>
-                ConstructorArgs = [Value 0]
-                PropertySets = []
-            }
-            PostProcess = Some lambda
-        }
-
+        { ReturnType = Single
+          Type = typedefof<string>
+          TypeOrLambda = 
+              TypeOrLambdaConstructionInfo.Type { Type = typedefof<string>
+                                                  ConstructorArgs = [ Value 0 ]
+                                                  PropertySets = [] }
+          PostProcess = Some lambda }
+    
     let result = (read reader ctor) :?> string
-
-    Assert.Equal("foo bar baz", result)
+    "foo bar baz" == result
 
 [<Fact>]
-let ``lambda post process many``() =
-
+let ``lambda post process many``() = 
     let reader = 
-        new LocalDataReader([["foo"]; ["bar"]; ["baz"]])
-
-    let lambda = toLambda <@ fun (vals : string seq) -> [vals |> String.concat(" "); vals |> String.concat(" ")] @> 
-
+        new LocalDataReader([ [ "foo" ]
+                              [ "bar" ]
+                              [ "baz" ] ])
+    
+    let lambda = 
+        toLambda <@ fun (vals : string seq) -> 
+                [ vals |> String.concat (" ")
+                  vals |> String.concat (" ") ] @>
+    
     let ctor = 
-        {
-            ReturnType = Many
-            Type = typedefof<string>
-            TypeOrLambda = TypeOrLambdaConstructionInfo.Type {
-                Type = typedefof<string>
-                ConstructorArgs = [Value 0]
-                PropertySets = []
-            }
-            PostProcess = Some lambda
-        }
-
+        { ReturnType = Many
+          Type = typedefof<string>
+          TypeOrLambda = 
+              TypeOrLambdaConstructionInfo.Type { Type = typedefof<string>
+                                                  ConstructorArgs = [ Value 0 ]
+                                                  PropertySets = [] }
+          PostProcess = Some lambda }
+    
     let result = (read reader ctor) :?> string seq
-
-    areSeqEqual ["foo bar baz"; "foo bar baz"] result
+    areSeqEqual [ "foo bar baz"; "foo bar baz" ] result
 
 [<Fact>]
-let ``lambda type mod``() =
-
-    let reader = 
-        new LocalDataReader([["foo"]])
-
-    let lambda = toLambda <@ fun ( opt : OptionName )  -> opt.OptionValue.Value + "bar"@> 
-
+let ``lambda type mod``() = 
+    let reader = new LocalDataReader([ [ "foo" ] ])
+    let lambda = toLambda <@ fun (opt : OptionName) -> opt.OptionValue.Value + "bar" @>
+    
     let ctor = 
-        {
-            ReturnType = Single
-            Type = typedefof<string>
-            TypeOrLambda = TypeOrLambdaConstructionInfo.Lambda {
-                Lambda = lambda
-                Parameters = [Type (ctorOptionName)]
-            }
-            PostProcess = None
-        }
-
+        { ReturnType = Single
+          Type = typedefof<string>
+          TypeOrLambda = 
+              TypeOrLambdaConstructionInfo.Lambda { Lambda = lambda
+                                                    Parameters = [ Type(ctorOptionName) ] }
+          PostProcess = None }
+    
     let result = (read reader ctor) :?> string
-
-    Assert.Equal("foobar", result)
-
+    "foobar" == result
 //
 //[<Fact>]
 //let ``group``() =
