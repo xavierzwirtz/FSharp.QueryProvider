@@ -346,7 +346,7 @@ module QueryGenTest =
         
         let bools = AreEqualExpressionReturn q "SELECT T.[Value] FROM [BoolRecord] AS T WHERE ((T.[Value] = @p1))" DataReaderData.bools
         let bools = bools :?> seq<BoolRecord>
-        areSeqEqual [{ BoolRecord.Value = false }; { BoolRecord.Value = true }] bools
+        areSeqEqual [{ BoolRecord.Value = true }; { BoolRecord.Value = false }] bools
 
     [<Fact>]
     let ``select some``() =

@@ -122,13 +122,13 @@ let ``one bool false``() =
 let ``one int bool true``() = 
     let reader = new LocalDataReader([ [ 0 ] ])
     let result = (read reader (ctorOneSimple typedefof<bool>)) :?> bool
-    true == result
+    false == result
 
 [<Fact>]
 let ``one int bool false``() = 
     let reader = new LocalDataReader([ [ 1 ] ])
     let result = (read reader (ctorOneSimple typedefof<bool>)) :?> bool
-    false == result
+    true == result
 
 //[<Fact>]
 //let ``one byte``() =
