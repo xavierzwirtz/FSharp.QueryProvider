@@ -1,3 +1,6 @@
+### 1.0.7 - April 2 2017
+* Added averageBy support
+
 ### 1.0.6 - March 30 2016
 * Fixed bools being inverted again
 

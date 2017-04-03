@@ -21,6 +21,9 @@ type JobKind =
 | Salesman = 0
 | Manager = 1
 
+type FloatType =
+    { Float : float }
+
 type Person =
     { PersonId : int
       PersonName : string

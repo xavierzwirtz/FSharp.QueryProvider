@@ -190,6 +190,7 @@ module QueryGenTest =
 
     let stringSelect = simpleSelect typedefof<string>
     let intSelect = simpleSelect typedefof<int>
+    let floatSelect = simpleSelect typedefof<float>
     let boolSelect = simpleSelect typedefof<bool>
 
     [<Fact>]
@@ -1298,6 +1299,16 @@ module QueryGenTest =
             }
                    
         AreEqualExpression q "SELECT SUM(T.[PersonId]) FROM [Person] AS T" [] (intSelect 0 Single)
+
+    [<Fact>]
+    let ``average``() =
+        let q = fun (persons : IQueryable<FloatType>) -> 
+            query {
+                for p in persons do
+                averageBy(p.Float)
+            }
+                   
+        AreEqualExpression q "SELECT AVG(T.[Float]) FROM [FloatType] AS T" [] (floatSelect 0 Single)
 
 // To be implemented:        
 //query {

@@ -55,7 +55,7 @@ let readBool (value : obj) =
         match i with 
         | 0 -> false :> obj
         | 1 -> true :> obj
-        | i -> failwith "not a bit %i" i
+        | i -> failwithf "not a bit %i" i
     | :? bool as b -> b :> obj
     | x -> failwithf "unexpected type %s" (x.GetType().FullName)
 
